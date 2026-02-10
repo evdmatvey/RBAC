@@ -1,7 +1,8 @@
 void main() {
     try {
-        User u1 = User.validate("rj332jjklwj", "Ivan Ivan", "ivanrj332@mail.ru");
-        User u2 = User.validate("rj", "Ivan Ivan", "ivanrj332@.ru");
+        User u1 = User.validate("1", "Ivan Ivan", "ivanrj332@mail.ru");
+
+        System.out.println(u1.format());
     } catch (Exception e) {
         IO.println(e.getMessage());
     }

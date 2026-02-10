@@ -1,5 +1,5 @@
 public record User(String username, String fullName, String email) {
-    public static User validate(String username, String fullName, String email) {
+    public static User create(String username, String fullName, String email) {
         if (username == null || fullName == null || email == null)
             throw new IllegalArgumentException("Поля пользователя не должны быть null!");
 
