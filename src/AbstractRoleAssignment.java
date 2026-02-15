@@ -14,6 +14,12 @@ public abstract class AbstractRoleAssignment implements RoleAssignment {
     }
 
     @Override
+    public abstract boolean isActive();
+
+    @Override
+    public abstract String assignmentType();
+
+    @Override
     public String assignmentId() {
         return this.assignmentId;
     }
@@ -31,16 +37,6 @@ public abstract class AbstractRoleAssignment implements RoleAssignment {
     @Override
     public AssignmentMetadata metadata() {
         return this.assignmentMetadata;
-    }
-
-    @Override
-    public boolean isActive() {
-        return false;
-    }
-
-    @Override
-    public String assignmentType() {
-        return "";
     }
 
     @Override
