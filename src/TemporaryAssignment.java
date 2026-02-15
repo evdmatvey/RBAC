@@ -68,7 +68,7 @@ public class TemporaryAssignment extends AbstractRoleAssignment{
 
     @Override
     public boolean isActive() {
-        return this.isExpired();
+        return !this.isExpired();
     }
 
     @Override
@@ -80,6 +80,6 @@ public class TemporaryAssignment extends AbstractRoleAssignment{
     public String summary() {
         String summary = super.summary();
 
-        return summary + String.format("\n Expires at: %s", this.expiresAt);
+        return summary + String.format("\nExpires at: %s", this.expiresAt);
     }
 }

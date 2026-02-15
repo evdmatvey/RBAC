@@ -13,10 +13,8 @@ public abstract class AbstractRoleAssignment implements RoleAssignment {
         this.assignmentMetadata = assignmentMetadata;
     }
 
-    @Override
     public abstract boolean isActive();
 
-    @Override
     public abstract String assignmentType();
 
     @Override
