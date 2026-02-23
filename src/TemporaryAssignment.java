@@ -66,6 +66,10 @@ public class TemporaryAssignment extends AbstractRoleAssignment{
         }
     }
 
+    public String getExpiresAt() {
+        return this.expiresAt;
+    }
+
     @Override
     public boolean isActive() {
         return !this.isExpired();
