@@ -10,12 +10,23 @@ repositories {
 }
 
 dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 sourceSets {
     main {
         java {
             setSrcDirs(listOf("src"))
+        }
+    }
+    test {
+        java {
+            setSrcDirs(listOf("test"))
         }
     }
 }
