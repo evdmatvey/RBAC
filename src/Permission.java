@@ -3,8 +3,7 @@ import java.util.Locale;
 public record Permission(String name, String resource, String description) {
 
     public Permission(String name, String resource, String description) {
-        if (description == null || description.isEmpty())
-            throw new IllegalArgumentException("Описание не должно быть пустым!");
+        ValidationUtils.requireNonEmpty(description, "description");
 
         this.name = name.toUpperCase(Locale.ROOT).replace(" ", "");
         this.resource = resource.toLowerCase(Locale.ROOT);
