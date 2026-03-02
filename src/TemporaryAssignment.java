@@ -11,22 +11,25 @@ public class TemporaryAssignment extends AbstractRoleAssignment{
     }
 
     public void extend(String newExpirationDate) {
-        if (newExpirationDate == null || newExpirationDate.isEmpty())
-            throw new IllegalArgumentException("Укажите корректную новую дату!");
+        ValidationUtils.requireNonEmpty(newExpirationDate, "newExpirationDate");
+
+        if(!ValidationUtils.isValidDate(newExpirationDate))
+            throw new IllegalArgumentException("Неверный формат даты!");
+
+        if (DateUtils.isBefore(newExpirationDate, DateUtils.getCurrentDate()))
+            throw new IllegalArgumentException("Дата истечения не может быть в прошлом!");
 
         this.expiresAt = newExpirationDate;
     }
 
     public boolean isExpired() {
-        LocalDateTime expiresAt = LocalDateTime.parse(this.expiresAt);
+        ValidationUtils.requireNonEmpty(expiresAt, "expiresAt");
 
-        return expiresAt.isBefore(LocalDateTime.now());
+        return DateUtils.isBefore(expiresAt, DateUtils.getCurrentDate());
     }
 
     public String getTimeRemaining() {
-        if (expiresAt == null || expiresAt.isEmpty()) {
-            return "Never expires";
-        }
+        ValidationUtils.requireNonEmpty(expiresAt, "expiresAt");
 
         try {
             LocalDateTime expirationDate = LocalDateTime.parse(expiresAt);
