@@ -2,21 +2,19 @@ package commands;
 
 import entities.Permission;
 import entities.Role;
+import entities.RoleAssignment;
 import entities.User;
-import filters.UserFilter;
-import filters.UserFilters;
-import repositories.AssignmentManager;
+import filters.*;
 import repositories.UserManager;
 import utils.ConsoleUtils;
 import utils.FormatUtils;
 
-import java.sql.SQLOutput;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class CommandRegistry {
     public static void setupCommands(CommandParser commandParser) {
         setupUserManageCommands(commandParser);
+        setupRoleManageCommands(commandParser);
     }
 
     private static void setupUserManageCommands(CommandParser commandParser) {
@@ -97,7 +95,7 @@ public class CommandRegistry {
         commandParser.registerCommand("user-delete", "Delete user by username",
                 (scanner, rbacSystem) -> {
             String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
-            boolean confirm = ConsoleUtils.promptYesNo(scanner, "Are you sure? : ");
+            boolean confirm = ConsoleUtils.promptYesNo(scanner, "Are you sure?");
 
             if (!confirm) return;
 
@@ -156,6 +154,177 @@ public class CommandRegistry {
             } else {
                 User u = user.orElseThrow(() -> new NoSuchElementException("User not found!"));
                 System.out.println("User: " + u.format());
+            }
+        });
+    }
+
+    private static void setupRoleManageCommands(CommandParser commandParser) {
+        commandParser.registerCommand("role-list", "Show all roles",
+                (scanner, rbacSystem) -> {
+            List<Role> roles = rbacSystem.getRoleManager().findAll();
+
+            if(roles.isEmpty()) {
+                System.out.println("No roles!");
+                return;
+            }
+
+            String[] headers = {"Name", "Permissions count", "Id"};
+            List<String[]> rows = new ArrayList<>();
+
+            for(Role role : roles) {
+                rows.add(new String[]{role.getName(), String.valueOf(role.getPermissions().size()), role.getId()});
+            }
+
+            System.out.println(FormatUtils.formatTable(headers, rows));
+        });
+
+        commandParser.registerCommand("role-create", "Create role",
+                (scanner, rbacSystem) -> {
+            String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+            String description = ConsoleUtils.promptString(scanner, "Enter description: ", true);
+
+            Role created = new Role(name, description);
+            rbacSystem.getRoleManager().add(created);
+
+            System.out.println("Role created: " + created.compactFormat());
+        });
+
+        commandParser.registerCommand("role-view", "Get role information by name",
+                (scanner, rbacSystem) -> {
+            String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+
+            Role role = rbacSystem.getRoleManager().findByName(name)
+                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+
+            System.out.println(role.format());
+        });
+
+        commandParser.registerCommand("role-delete", "Delete role by name",
+                (scanner, rbacSystem) -> {
+            String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+
+            Role role = rbacSystem.getRoleManager().findByName(name)
+                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+
+            AssignmentFilter roleFilter = AssignmentFilters.byRole(role);
+
+            List<User> users = rbacSystem.getAssignmentManager().findByFilter(roleFilter).stream()
+                    .map(RoleAssignment::user)
+                    .toList();
+
+            if (!users.isEmpty()) {
+                String[] headers = {"Name", "Full name", "Email"};
+                List<String[]> rows = users.stream()
+                        .map(u -> new String[]{u.username(), u.fullName(), u.email()})
+                        .toList();
+
+                System.out.println(FormatUtils.formatHeader("Users with role"));
+                System.out.println(FormatUtils.formatTable(headers, rows));
+            }
+
+            boolean confirm = ConsoleUtils.promptYesNo(scanner, "Are you sure? (yes/no): ");
+
+            if(confirm) {
+                boolean isDeleted = rbacSystem.getRoleManager().remove(role);
+                if(isDeleted){
+                    System.out.println(String.format("Role deleted: %s" + role.compactFormat()));
+                } else {
+                    System.out.println("Some issues found while deleting role. Try again later [0-0]");
+                }
+            }
+        });
+
+        commandParser.registerCommand("role-add-permission", "Add new permission to role",
+                (scanner, rbacSystem) -> {
+            String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+
+            Role role = rbacSystem.getRoleManager().findByName(name)
+                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+
+            String permissionName = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+            String permissionResource = ConsoleUtils.promptString(scanner, "Enter resource: ", true);
+            String permissionDescription = ConsoleUtils.promptString(scanner, "Enter description: ", true);
+
+            Permission permission = new Permission(permissionName, permissionResource, permissionDescription);
+
+            rbacSystem.getRoleManager().addPermissionToRole(role.getName(), permission);
+
+            System.out.println(FormatUtils.formatHeader("Role updated!"));
+            System.out.println("Add new permission: " + permission.format());
+        });
+
+        commandParser.registerCommand("role-remove-permission", "Remove permission from role by name",
+                (scanner, rbacSystem) -> {
+            String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+
+            Role role = rbacSystem.getRoleManager().findByName(name)
+                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+
+            Set<Permission> permissions = role.getPermissions();
+            List<String> permissionNames = permissions.stream()
+                    .map(Permission::format)
+                    .toList();
+
+            String choice = ConsoleUtils.promptChoice(scanner, "Select permission to remove: ", permissionNames);
+            String[] parts = choice.split(" ");
+            String pName = parts[0];
+            String pResource = parts[2].replace(":", "");
+
+            Permission permission = permissions.stream()
+                    .filter(p ->  p.name().equals(pName) && p.resource().equals(pResource))
+                    .toList()
+                    .getFirst();
+
+            boolean confirm = ConsoleUtils.promptYesNo(scanner, "Are you sure?");
+
+            if (confirm) {
+                rbacSystem.getRoleManager().removePermissionFromRole(role.getName(), permission);
+
+                System.out.println("Permission deleted: " + permission.format());
+            }
+        });
+
+        commandParser.registerCommand("role-search", "Search role by selected method",
+                (scanner, rbacSystem) -> {
+            List<String> options = Arrays.asList("By name", "By permission", "By min permissions count");
+
+            String choice = ConsoleUtils.promptChoice(scanner, "Select search method: ", options);
+
+            List<Role> roles = new ArrayList<>();
+
+            if(options.get(0).equals(choice)) {
+                String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
+
+                Role role = rbacSystem.getRoleManager().findByName(name)
+                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+
+                System.out.println(role.format());
+                return;
+            }
+
+            if(options.get(1).equals(choice)) {
+                String permissionName = ConsoleUtils.promptString(scanner, "Enter permission name: ", true);
+                String permissionResource = ConsoleUtils.promptString(scanner, "Enter permission resource: ", true);
+
+                roles = rbacSystem.getRoleManager().findRolesWithPermission(permissionName, permissionResource);
+            }
+
+            if(options.get(2).equals(choice)) {
+                int minimalPermissionsCount = ConsoleUtils.promptInt(scanner, "Enter minimal permission count: ", 0, 100);
+                RoleFilter minimalFilter = RoleFilters.hasAtLeastNPermissions(minimalPermissionsCount);
+
+                roles = rbacSystem.getRoleManager().findByFilter(minimalFilter);
+            }
+
+            String[] headers = {"Id", "Name", "Permissions Count", "Description"};
+            List<String[]> rows = roles.stream()
+                    .map(r -> new String[]{r.getId(), r.getName(), String.valueOf(r.getPermissions().size()), r.getDescription()})
+                    .toList();
+
+            if(rows.isEmpty()) {
+                System.out.println("Roles not found!");
+            } else {
+                System.out.println(FormatUtils.formatTable(headers, rows));
             }
         });
     }

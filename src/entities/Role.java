@@ -107,4 +107,8 @@ public class Role {
 
         return sb.toString();
     }
+
+    public String compactFormat() {
+        return String.format("Role [%s] \"%s\", description: %s, permissions count <%s>", id, name, description, permissions.size());
+    }
 }
