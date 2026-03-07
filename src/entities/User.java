@@ -9,10 +9,10 @@ public record User(String username, String fullName, String email) {
         ValidationUtils.requireNonEmpty(email, "email");
 
         if (!ValidationUtils.isValidUsername(username))
-            throw new IllegalArgumentException("Некорректный формат имени пользователя!");
+            throw new IllegalArgumentException("Incorrect username format!");
 
         if (!ValidationUtils.isValidEmail(email))
-            throw new IllegalArgumentException("Некорректный формат email!");
+            throw new IllegalArgumentException("Incorrect email format!");
 
         return new User(username, fullName, email);
     }

@@ -91,7 +91,7 @@ public class Role {
     public String format() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append(String.format("entities.Role: %s [ID: %s]\n", name, id));
+        sb.append(String.format("Role: %s [ID: %s]\n", name, id));
 
         sb.append(String.format("Description: %s\n", description));
 

@@ -101,7 +101,7 @@ public class FormatUtils {
 
         String line = HORIZONTAL_LINE.repeat(text.length() + 4);
 
-        return String.format("%s\n| %s |\n%s\n", line, text, line);
+        return String.format("\n%s\n| %s |\n%s\n", line, text, line);
     }
 
     public static String truncate(String text, int maxLength) {

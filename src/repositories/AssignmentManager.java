@@ -167,6 +167,18 @@ public class AssignmentManager implements Repository<RoleAssignment> {
                 .collect(Collectors.toSet());
     }
 
+    public Set<Role> getUserRoles(User user) {
+        if (user == null) {
+            return Collections.emptySet();
+        }
+
+        return assignments.values().stream()
+                .filter(RoleAssignment::isActive)
+                .filter(a -> a.user().equals(user))
+                .map(RoleAssignment::role)
+                .collect(Collectors.toSet());
+    }
+
     public void revokeAssignment(String assignmentId) {
         if (assignmentId == null) {
             throw new IllegalArgumentException("Assignment ID cannot be null");

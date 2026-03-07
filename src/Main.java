@@ -1,24 +1,24 @@
+import commands.CommandParser;
+import commands.CommandRegistry;
+import commands.RBACSystem;
 import entities.*;
 import utils.DateUtils;
 
 void main() {
-    User user = new User("username", "full name", "email@mail.ru");
-    User user2 = new User("operator", "full name", "email@mail.ru");
-    Role role = new Role("admin", "admin permissions");
-    Permission p1 = new Permission("read", "users", "can read users");
-    Permission p2 = new Permission("delete", "users", "can delete users");
-    role.addPermission(p1);
-    role.addPermission(p2);
-    AssignmentMetadata am = AssignmentMetadata.now(user2.username(), "with some reason");
+    RBACSystem rbacSystem = new RBACSystem();
+    rbacSystem.initialize();
 
-    TemporaryAssignment ta = new TemporaryAssignment(user, role, am);
-    ta.extend(DateUtils.getCurrentDate());
-    System.out.println(ta.summary());
-    ta.extend(DateUtils.getCurrentDate());
-    System.out.println(ta.summary());
+    CommandParser commandParser = new CommandParser();
+    CommandRegistry.setupCommands(commandParser);
 
-    PermanentAssignment pa = new PermanentAssignment(user, role, am);
-    System.out.println(pa.summary());
-    pa.revoke();
-    System.out.println(pa.summary());
+    Scanner scanner = new Scanner(System.in);
+    while (true) {
+        System.out.println("\n[RBAC]>");
+        String input = scanner.nextLine();
+
+        if (input.isBlank())
+            continue;
+
+        commandParser.parseAndExecute(input, scanner, rbacSystem);
+    }
 }
