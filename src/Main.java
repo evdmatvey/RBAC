@@ -7,6 +7,7 @@ import utils.DateUtils;
 void main() {
     RBACSystem rbacSystem = new RBACSystem();
     rbacSystem.initialize();
+    rbacSystem.setCurrentUser("admin");
 
     CommandParser commandParser = new CommandParser();
     CommandRegistry.setupCommands(commandParser);

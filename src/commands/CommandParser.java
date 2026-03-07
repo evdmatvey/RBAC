@@ -7,7 +7,7 @@ import java.util.*;
 
 public class CommandParser {
     private final Map<String, Command> commands = new HashMap<>();
-    private final Map<String, String> commandDescriptions = new HashMap<>();
+    private final Map<String, String> commandDescriptions = new LinkedHashMap<>();
 
     public void registerCommand(String name, String description, Command command) {
         commands.put(name, command);

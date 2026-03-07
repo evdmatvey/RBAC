@@ -62,24 +62,16 @@ public class AuditLog {
 
     public void printLog() {
         if (entries.isEmpty()) {
-            System.out.println("Лог пуст");
+            System.out.println("Audit log is empty :(");
             return;
         }
 
-        System.out.println("=== Аудит лог ===");
-        System.out.printf("%-20s | %-15s | %-15s | %-20s | %s%n",
-                "Timestamp", "Action", "Performer", "Target", "Details");
-        System.out.println("-".repeat(90));
+        String[] headers = {"Timestamp", "Action", "Performer", "Target", "Details"};
+        List<String[]> rows = entries.stream()
+                .map(e -> new String[]{e.timestamp(), e.action(), e.performer(), e.target(), e.details()})
+                .toList();
 
-        for (AuditEntry entry : entries) {
-            System.out.printf("%-20s | %-15s | %-15s | %-20s | %s%n",
-                    entry.timestamp(),
-                    entry.action(),
-                    entry.performer(),
-                    entry.target(),
-                    entry.details()
-            );
-        }
+        System.out.println(FormatUtils.formatTable(headers, rows));
     }
 
     public void saveToFile(String filename) {

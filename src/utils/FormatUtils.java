@@ -137,8 +137,8 @@ public class FormatUtils {
         return " ".repeat(length - text.length()) + text;
     }
 
-    public static String formatCurrency(double amount) {
-        return String.format("$%,.2f", amount);
+    public static String formatFloatNumber(double amount) {
+        return String.format("%,.2f", amount);
     }
 
     public static String formatPercentage(double value) {

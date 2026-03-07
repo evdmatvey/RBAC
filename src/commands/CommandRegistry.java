@@ -1,10 +1,8 @@
 package commands;
 
-import entities.Permission;
-import entities.Role;
-import entities.RoleAssignment;
-import entities.User;
+import entities.*;
 import filters.*;
+import repositories.AssignmentManager;
 import repositories.UserManager;
 import utils.ConsoleUtils;
 import utils.FormatUtils;
@@ -12,9 +10,12 @@ import utils.FormatUtils;
 import java.util.*;
 
 public class CommandRegistry {
+    private static AuditLog auditLog = new AuditLog();
+
     public static void setupCommands(CommandParser commandParser) {
         setupUserManageCommands(commandParser);
         setupRoleManageCommands(commandParser);
+        setupServiceCommands(commandParser);
     }
 
     private static void setupUserManageCommands(CommandParser commandParser) {
@@ -47,6 +48,8 @@ public class CommandRegistry {
 
             rbacSystem.getUserManager().add(created);
             System.out.println("User created: " + created.format());
+
+            auditLog.log("CREATE_USER", rbacSystem.getCurrentUser(), "users", created.format());
         });
 
         commandParser.registerCommand("user-view", "Get user information by username",
@@ -106,6 +109,7 @@ public class CommandRegistry {
 
             if (result) {
                 System.out.println("User: " + user.format() + " [deleted]");
+                auditLog.log("DELETE_USER", rbacSystem.getCurrentUser(), "users", user.format());
             } else {
                 System.out.println("Some errors detected while deleting, try again later [0_o]");
             }
@@ -187,6 +191,8 @@ public class CommandRegistry {
             rbacSystem.getRoleManager().add(created);
 
             System.out.println("Role created: " + created.compactFormat());
+
+            auditLog.log("CREATE_ROLE", rbacSystem.getCurrentUser(), "roles", created.compactFormat());
         });
 
         commandParser.registerCommand("role-view", "Get role information by name",
@@ -228,6 +234,7 @@ public class CommandRegistry {
                 boolean isDeleted = rbacSystem.getRoleManager().remove(role);
                 if(isDeleted){
                     System.out.println(String.format("Role deleted: %s" + role.compactFormat()));
+                    auditLog.log("DELETE_ROLE", rbacSystem.getCurrentUser(), "roles", "delete success");
                 } else {
                     System.out.println("Some issues found while deleting role. Try again later [0-0]");
                 }
@@ -326,6 +333,89 @@ public class CommandRegistry {
             } else {
                 System.out.println(FormatUtils.formatTable(headers, rows));
             }
+        });
+    }
+
+    private static void setupServiceCommands(CommandParser commandParser) {
+        commandParser.registerCommand("help", "Get information about available commands",
+                (scanner, rbacSystem) -> {
+            commandParser.printHelp();
+        });
+
+        commandParser.registerCommand("stats", "Get RBAC statistics",
+                (scanner, rbacSystem) -> {
+            System.out.println(rbacSystem.generateStatistics());
+
+            AssignmentManager assignmentManager = rbacSystem.getAssignmentManager();
+            String totalAssignments = String.valueOf(assignmentManager.count());
+            String activeAssignments = String.valueOf(assignmentManager.getActiveAssignments().size());
+            String inactiveAssignments = String.valueOf(assignmentManager.getExpiredAssignments().size());
+
+            String[] headers = {"Total", "Active", "Inactive"};
+            List<String[]> rows = new ArrayList<>();
+            rows.add(new String[]{totalAssignments, activeAssignments, inactiveAssignments});
+
+            System.out.println(FormatUtils.formatHeader("Assignments distribution"));
+            System.out.println(FormatUtils.formatTable(headers, rows));
+
+            int usersCount = rbacSystem.getUserManager().count();
+            int rolesCount = rbacSystem.getRoleManager().count();
+            float averageRolesUsers = (float)usersCount / (float)rolesCount;
+
+            System.out.println(FormatUtils.formatHeader("Average roles by user: " +
+                    FormatUtils.formatFloatNumber(averageRolesUsers)));
+
+            Map<Role, Integer> roleRating = new HashMap<>();
+
+            for (RoleAssignment assignment : assignmentManager.getActiveAssignments()) {
+                Role role = assignment.role();
+
+                if (roleRating.containsKey(role)) {
+                    roleRating.put(role, roleRating.get(role) + 1);
+                } else {
+                    roleRating.put(role, 1);
+                }
+            }
+
+            List<Map.Entry<Role, Integer>> rolesTop = roleRating.entrySet().stream()
+                    .sorted((r1, r2) -> r1.getValue().compareTo(r2.getValue()))
+                    .limit(3)
+                    .toList();
+
+            String[] rolesTopHeaders = {"Id", "Name", "Description", "Usage", "Permissions count"};
+            List<String[]> rolesTopRows = rolesTop.stream()
+                    .map(rt -> {
+                        Role role = rt.getKey();
+                        String usage = String.valueOf(rt.getValue());
+                        String permissionsCount = String.valueOf(role.getPermissions().size());
+
+                        return new String[]{role.getId(), role.getName(), role.getDescription(), usage, permissionsCount};
+                    })
+                    .toList();
+
+            System.out.println(FormatUtils.formatHeader("Top 3 roles"));
+            System.out.println(FormatUtils.formatTable(rolesTopHeaders, rolesTopRows));
+        });
+
+        commandParser.registerCommand("clear", "Clear console",
+                (scanner, rbacSystem) -> {
+            for (int i = 0; i < 50; i++) {
+                System.out.println();
+            }
+        });
+
+        commandParser.registerCommand("exit", "Shutdown RBAC",
+                (scanner, rbacSystem) -> {
+            boolean confirm = ConsoleUtils.promptYesNo(scanner, "Are you sure?");
+
+            if(confirm) {
+                System.exit(0);
+            }
+        });
+
+        commandParser.registerCommand("audit-log", "Show audit log",
+                (scanner, rbacSystem) -> {
+            auditLog.printLog();
         });
     }
 }
