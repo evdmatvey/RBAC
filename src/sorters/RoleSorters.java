@@ -1,3 +1,7 @@
+package sorters;
+
+import entities.Role;
+
 import java.util.Comparator;
 
 public class RoleSorters {

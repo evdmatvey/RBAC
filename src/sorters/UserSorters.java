@@ -1,3 +1,7 @@
+package sorters;
+
+import entities.User;
+
 import java.util.Comparator;
 
 public class UserSorters {

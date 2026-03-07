@@ -1,3 +1,9 @@
+package repositories;
+
+import entities.User;
+import filters.UserFilter;
+import filters.UserFilters;
+
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -8,10 +14,10 @@ public class UserManager implements Repository<User> {
     @Override
     public void add(User user) {
         if (user == null) {
-            throw new IllegalArgumentException("User cannot be null");
+            throw new IllegalArgumentException("entities.User cannot be null");
         }
         if (users.containsKey(user.username())) {
-            throw new IllegalArgumentException("User with username " + user.username() + " already exists");
+            throw new IllegalArgumentException("entities.User with username " + user.username() + " already exists");
         }
         validateUser(user);
         users.put(user.username(), user);
@@ -105,7 +111,7 @@ public class UserManager implements Repository<User> {
 
         User existing = users.get(username);
         if (existing == null) {
-            throw new NoSuchElementException("User not found: " + username);
+            throw new NoSuchElementException("entities.User not found: " + username);
         }
 
         String fullName = newFullName != null ? newFullName : existing.fullName();

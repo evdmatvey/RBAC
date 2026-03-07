@@ -1,3 +1,5 @@
+package entities;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -66,7 +68,7 @@ public class Role {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Role{")
+        sb.append("entities.Role{")
                 .append("id='").append(id).append('\'')
                 .append(", name='").append(name).append('\'')
                 .append(", description='").append(description).append('\'')
@@ -89,7 +91,7 @@ public class Role {
     public String format() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append(String.format("Role: %s [ID: %s]\n", name, id));
+        sb.append(String.format("entities.Role: %s [ID: %s]\n", name, id));
 
         sb.append(String.format("Description: %s\n", description));
 

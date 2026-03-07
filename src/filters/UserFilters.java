@@ -1,3 +1,5 @@
+package filters;
+
 import java.util.Locale;
 
 public class UserFilters {

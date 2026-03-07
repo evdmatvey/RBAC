@@ -1,8 +1,12 @@
+package entities;
+
+import utils.*;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 
-public class TemporaryAssignment extends AbstractRoleAssignment{
+public class TemporaryAssignment extends AbstractRoleAssignment {
     private String expiresAt = "";
     private boolean autoRenew = false;
 
@@ -14,10 +18,10 @@ public class TemporaryAssignment extends AbstractRoleAssignment{
         ValidationUtils.requireNonEmpty(newExpirationDate, "newExpirationDate");
 
         if(!ValidationUtils.isValidDate(newExpirationDate))
-            throw new IllegalArgumentException("Неверный формат даты!");
+            throw new IllegalArgumentException("Incorrect date format!");
 
         if (DateUtils.isBefore(newExpirationDate, DateUtils.getCurrentDate()))
-            throw new IllegalArgumentException("Дата истечения не может быть в прошлом!");
+            throw new IllegalArgumentException("Incorrect expires at value!");
 
         this.expiresAt = newExpirationDate;
     }

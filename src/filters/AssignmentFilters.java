@@ -1,3 +1,7 @@
+package filters;
+
+import entities.*;
+
 import java.time.LocalDateTime;
 
 public class AssignmentFilters {

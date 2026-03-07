@@ -1,3 +1,7 @@
+package filters;
+
+import entities.*;
+
 @FunctionalInterface
 public interface AssignmentFilter {
     boolean test(RoleAssignment assignment);

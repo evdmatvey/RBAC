@@ -1,3 +1,5 @@
+package entities;
+
 import java.time.LocalDateTime;
 
 public record AssignmentMetadata(String assignedBy, String assignedAt, String reason) {

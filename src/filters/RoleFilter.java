@@ -1,3 +1,7 @@
+package filters;
+
+import entities.Role;
+
 @FunctionalInterface
 public interface RoleFilter {
     boolean test(Role role);

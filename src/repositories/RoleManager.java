@@ -1,3 +1,10 @@
+package repositories;
+
+import entities.Permission;
+import entities.Role;
+import filters.RoleFilter;
+import filters.RoleFilters;
+
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -9,10 +16,10 @@ public class RoleManager implements Repository<Role> {
     @Override
     public void add(Role role) {
         if (role == null) {
-            throw new IllegalArgumentException("Role cannot be null");
+            throw new IllegalArgumentException("entities.Role cannot be null");
         }
         if (rolesByName.containsKey(role.getName())) {
-            throw new IllegalArgumentException("Role with name " + role.getName() + " already exists");
+            throw new IllegalArgumentException("entities.Role with name " + role.getName() + " already exists");
         }
         rolesById.put(role.getId(), role);
         rolesByName.put(role.getName(), role);
@@ -94,12 +101,12 @@ public class RoleManager implements Repository<Role> {
 
     public void addPermissionToRole(String roleName, Permission permission) {
         if (roleName == null || permission == null) {
-            throw new IllegalArgumentException("Role name and permission cannot be null");
+            throw new IllegalArgumentException("entities.Role name and permission cannot be null");
         }
 
         Role role = rolesByName.get(roleName);
         if (role == null) {
-            throw new NoSuchElementException("Role not found: " + roleName);
+            throw new NoSuchElementException("entities.Role not found: " + roleName);
         }
 
         role.addPermission(permission);
@@ -107,12 +114,12 @@ public class RoleManager implements Repository<Role> {
 
     public void removePermissionFromRole(String roleName, Permission permission) {
         if (roleName == null || permission == null) {
-            throw new IllegalArgumentException("Role name and permission cannot be null");
+            throw new IllegalArgumentException("entities.Role name and permission cannot be null");
         }
 
         Role role = rolesByName.get(roleName);
         if (role == null) {
-            throw new NoSuchElementException("Role not found: " + roleName);
+            throw new NoSuchElementException("entities.Role not found: " + roleName);
         }
 
         role.removePermission(permission);

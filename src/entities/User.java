@@ -1,3 +1,7 @@
+package entities;
+
+import utils.*;
+
 public record User(String username, String fullName, String email) {
     public static User create(String username, String fullName, String email) {
         ValidationUtils.requireNonEmpty(username, "username");

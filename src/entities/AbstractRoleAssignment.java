@@ -1,3 +1,5 @@
+package entities;
+
 import java.util.UUID;
 
 public abstract class AbstractRoleAssignment implements RoleAssignment {

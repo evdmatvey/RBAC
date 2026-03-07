@@ -1,3 +1,7 @@
+package filters;
+
+import entities.Permission;
+
 import java.util.Locale;
 
 public class RoleFilters {

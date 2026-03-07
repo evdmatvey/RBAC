@@ -1,3 +1,9 @@
+package repositories;
+
+import filters.AssignmentFilter;
+import entities.*;
+import filters.*;
+
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -22,11 +28,11 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         Role role = assignment.role();
 
         if (!userManager.findByUsername(user.username()).isPresent()) {
-            throw new IllegalArgumentException("User does not exist: " + user.username());
+            throw new IllegalArgumentException("entities.User does not exist: " + user.username());
         }
 
         if (!roleManager.findByName(role.getName()).isPresent()) {
-            throw new IllegalArgumentException("Role does not exist: " + role.getName());
+            throw new IllegalArgumentException("entities.Role does not exist: " + role.getName());
         }
 
         boolean hasActiveAssignment = assignments.values().stream()
@@ -34,7 +40,7 @@ public class AssignmentManager implements Repository<RoleAssignment> {
                 .anyMatch(RoleAssignment::isActive);
 
         if (hasActiveAssignment) {
-            throw new IllegalArgumentException("User already has active assignment for role: " + role.getName());
+            throw new IllegalArgumentException("entities.User already has active assignment for role: " + role.getName());
         }
 
         assignments.put(assignment.assignmentId(), assignment);

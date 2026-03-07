@@ -1,3 +1,6 @@
+package utils;
+
+import java.time.LocalDateTime;
 import java.util.regex.Pattern;
 
 public class ValidationUtils {
@@ -9,7 +12,10 @@ public class ValidationUtils {
             Pattern.compile("^[\\w.%+-]+@[\\w.-]+\\.[a-z]{2,}$");
 
     private static final Pattern DATE_PATTERN =
-            Pattern.compile("^(0[1-9]|[12][0-9]|3[01])\\.(0[1-9]|1[0-2])\\.(19|20)\\d{2}$");
+            Pattern.compile("^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$");
+
+    private static final Pattern DATE_TIME_PATTERN =
+            Pattern.compile("^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01]) ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$");
 
     public static boolean isValidUsername(String username) {
         if (username == null) return false;
@@ -25,19 +31,15 @@ public class ValidationUtils {
     }
 
     public static boolean isValidDate(String date) {
-        if (date == null) return false;
-        if (date.isEmpty()) return false;
+        ValidationUtils.requireNonEmpty(date, "date");
 
-        if (!DATE_PATTERN.matcher(date).matches()) {
-            return false;
-        }
+        return DATE_PATTERN.matcher(date).matches();
+    }
 
-        String[] parts = date.split("\\.");
-        int day = Integer.parseInt(parts[0]);
-        int month = Integer.parseInt(parts[1]);
-        int year = Integer.parseInt(parts[2]);
+    public static boolean isValidDateTime(String dateTime) {
+        ValidationUtils.requireNonEmpty(dateTime, "dateTime");
 
-        return isValidDateComponents(day, month, year);
+        return DATE_TIME_PATTERN.matcher(dateTime).matches();
     }
 
     public static String normalizeString(String input) {
@@ -56,12 +58,12 @@ public class ValidationUtils {
     public static void requireNonEmpty(String value, String fieldName) {
         if (value == null) {
             throw new IllegalArgumentException(
-                    String.format("Поле '%s' не должно быть null!", fieldName)
+                    String.format("Filed '%s' shouldn't be null!", fieldName)
             );
         }
         if (value.isEmpty()) {
             throw new IllegalArgumentException(
-                    String.format("Поле '%s' не должно быть пустым!", fieldName)
+                    String.format("Field '%s' shouldn't be empty!", fieldName)
             );
         }
     }

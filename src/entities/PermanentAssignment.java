@@ -1,3 +1,5 @@
+package entities;
+
 public class PermanentAssignment extends AbstractRoleAssignment {
     private boolean revoked = false;
 

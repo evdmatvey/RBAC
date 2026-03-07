@@ -1,3 +1,6 @@
+import entities.*;
+import utils.DateUtils;
+
 void main() {
     User user = new User("username", "full name", "email@mail.ru");
     User user2 = new User("operator", "full name", "email@mail.ru");
@@ -8,11 +11,10 @@ void main() {
     role.addPermission(p2);
     AssignmentMetadata am = AssignmentMetadata.now(user2.username(), "with some reason");
 
-
     TemporaryAssignment ta = new TemporaryAssignment(user, role, am);
-    ta.extend(LocalDate.parse("2040-02-20").atStartOfDay().toString());
+    ta.extend(DateUtils.getCurrentDate());
     System.out.println(ta.summary());
-    ta.extend(LocalDate.parse("2010-02-20").atStartOfDay().toString());
+    ta.extend(DateUtils.getCurrentDate());
     System.out.println(ta.summary());
 
     PermanentAssignment pa = new PermanentAssignment(user, role, am);

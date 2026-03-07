@@ -1,3 +1,7 @@
+package entities;
+
+import utils.*;
+
 import java.util.Locale;
 
 public record Permission(String name, String resource, String description) {
