@@ -9,6 +9,7 @@ import utils.DateUtils;
 import utils.FormatUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class CommandRegistry {
     private static AuditLog auditLog = new AuditLog();
@@ -17,6 +18,7 @@ public class CommandRegistry {
         setupUserManageCommands(commandParser);
         setupRoleManageCommands(commandParser);
         setupAssignmentManageCommands(commandParser);
+        setupPermissionsCommands(commandParser);
         setupServiceCommands(commandParser);
     }
 
@@ -550,6 +552,48 @@ public class CommandRegistry {
             }
 
             System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
+        });
+    }
+
+    private static void setupPermissionsCommands(CommandParser commandParser) {
+        commandParser.registerCommand("permissions-user", "Get list of user permissions",
+                (scanner, rbacSystem) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+            User user = rbacSystem.getUserManager().findByUsername(username)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
+
+            List<Permission> permissions = rbacSystem.getAssignmentManager().getUserPermissions(user).stream().toList();
+            Map<String, List<Permission>> groupedByResource = permissions.stream()
+                    .collect(Collectors.groupingBy(Permission::resource));
+
+            groupedByResource.forEach((resource, perms) -> {
+                List<String> formatted = perms.stream().map(Permission::format).toList();
+                System.out.println(FormatUtils.formatHeader(resource));
+                System.out.println(FormatUtils.formatList(formatted, "- ", ""));
+            });
+        });
+
+        commandParser.registerCommand("permissions-check", "Check user has permission",
+                (scanner, rbacSystem) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+            User user = rbacSystem.getUserManager().findByUsername(username)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
+
+            String name = ConsoleUtils.promptString(scanner, "Enter permission name: ", true);
+            String resource = ConsoleUtils.promptString(scanner, "Enter permission resource: ", true);
+
+            boolean userHasPermission = rbacSystem.getAssignmentManager().userHasPermission(user, name, resource);
+
+            if(userHasPermission) {
+                List<String> roles = rbacSystem.getRoleManager().findRolesWithPermission(name, resource).stream()
+                        .map(Role::compactFormat)
+                        .toList();
+
+                System.out.println("Permission found in:");
+                System.out.println(FormatUtils.formatList(roles, "- ", ""));
+            } else {
+                System.out.println("Permission not found!");
+            }
         });
     }
 
