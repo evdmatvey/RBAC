@@ -5,6 +5,7 @@ import filters.*;
 import repositories.AssignmentManager;
 import repositories.UserManager;
 import utils.ConsoleUtils;
+import utils.DateUtils;
 import utils.FormatUtils;
 
 import java.util.*;
@@ -15,6 +16,7 @@ public class CommandRegistry {
     public static void setupCommands(CommandParser commandParser) {
         setupUserManageCommands(commandParser);
         setupRoleManageCommands(commandParser);
+        setupAssignmentManageCommands(commandParser);
         setupServiceCommands(commandParser);
     }
 
@@ -57,7 +59,7 @@ public class CommandRegistry {
             String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
 
             User user = rbacSystem.getUserManager().findByUsername(username)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("User with username \"%s\" not found!", username)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
 
             Set<Permission> permissions = rbacSystem.getAssignmentManager().getUserPermissions(user);
             Set<Role> roles = rbacSystem.getAssignmentManager().getUserRoles(user);
@@ -90,7 +92,7 @@ public class CommandRegistry {
             rbacSystem.getUserManager().update(username, fullName, email);
 
             User updated = rbacSystem.getUserManager().findByUsername(username)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("User with username \"%s\" not found!", username)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
 
             System.out.println("Updated user: " + updated.format());
         });
@@ -103,7 +105,7 @@ public class CommandRegistry {
             if (!confirm) return;
 
             User user = rbacSystem.getUserManager().findByUsername(username)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("User with username \"%s\" not found!", username)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
 
             boolean result = rbacSystem.getUserManager().remove(user);
 
@@ -200,7 +202,7 @@ public class CommandRegistry {
             String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
 
             Role role = rbacSystem.getRoleManager().findByName(name)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(name)));
 
             System.out.println(role.format());
         });
@@ -210,7 +212,7 @@ public class CommandRegistry {
             String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
 
             Role role = rbacSystem.getRoleManager().findByName(name)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(name)));
 
             AssignmentFilter roleFilter = AssignmentFilters.byRole(role);
 
@@ -246,7 +248,7 @@ public class CommandRegistry {
             String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
 
             Role role = rbacSystem.getRoleManager().findByName(name)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(name)));
 
             String permissionName = ConsoleUtils.promptString(scanner, "Enter name: ", true);
             String permissionResource = ConsoleUtils.promptString(scanner, "Enter resource: ", true);
@@ -265,7 +267,7 @@ public class CommandRegistry {
             String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
 
             Role role = rbacSystem.getRoleManager().findByName(name)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(name)));
 
             Set<Permission> permissions = role.getPermissions();
             List<String> permissionNames = permissions.stream()
@@ -303,7 +305,7 @@ public class CommandRegistry {
                 String name = ConsoleUtils.promptString(scanner, "Enter name: ", true);
 
                 Role role = rbacSystem.getRoleManager().findByName(name)
-                    .orElseThrow(() -> new NoSuchElementException(String.format("Role by name \"%s\" not found!", name)));
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(name)));
 
                 System.out.println(role.format());
                 return;
@@ -333,6 +335,221 @@ public class CommandRegistry {
             } else {
                 System.out.println(FormatUtils.formatTable(headers, rows));
             }
+        });
+    }
+
+    private static void setupAssignmentManageCommands(CommandParser commandParser) {
+        commandParser.registerCommand("assign-role", "Assign existing role to user by username",
+                (scanner, rbacSystem) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+            User user = rbacSystem.getUserManager().findByUsername(username)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
+
+            List<Role> roles = rbacSystem.getRoleManager().findAll();
+
+            String[] headers = {"Id", "Name", "Description"};
+            List<String[]> rows = roles.stream()
+                    .map(r -> new String[]{r.getId(), r.getName(), r.getDescription()})
+                    .toList();
+            System.out.println(FormatUtils.formatHeader("Existing roles"));
+            System.out.println(FormatUtils.formatTable(headers, rows));
+
+            List<String> roleNames = roles.stream()
+                    .map(Role::getName)
+                    .toList();
+            String choice = ConsoleUtils.promptChoice(scanner, "Select role", roleNames);
+
+            Role role = rbacSystem.getRoleManager().findByName(choice)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(choice)));
+
+            String reason = ConsoleUtils.promptString(scanner, "Enter reason: ", true);
+
+            boolean isPermanent = ConsoleUtils.promptYesNo(scanner, "Is permanents assignment?");
+            AbstractRoleAssignment assignment;
+
+            if(isPermanent) {
+                AssignmentMetadata metadata = AssignmentMetadata.now(rbacSystem.getCurrentUser(), reason);
+                assignment = new PermanentAssignment(user, role, metadata);
+            } else {
+                String expiresAt = ConsoleUtils.promptString(scanner, "Enter expiresAt (yyyy-mm-dd): ", true);
+
+                AssignmentMetadata metadata = AssignmentMetadata.now(rbacSystem.getCurrentUser(), reason);
+                TemporaryAssignment temporaryAssignment = new TemporaryAssignment(user, role, metadata);
+                temporaryAssignment.extend(expiresAt);
+                assignment = temporaryAssignment;
+            }
+
+            rbacSystem.getAssignmentManager().add(assignment);
+
+            System.out.println("Assignment added: " + assignment.summary());
+            auditLog.log("ASSIGN_ROLE", rbacSystem.getCurrentUser(), "assignments", "assign success");
+        });
+
+        commandParser.registerCommand("revoke-role", "Revoke assignment from user by username",
+                (scanner, rbacSystem) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+            User user = rbacSystem.getUserManager().findByUsername(username)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
+
+            AssignmentFilter userActiveFilter = AssignmentFilters.activeOnly().and(AssignmentFilters.byUser(user));
+            List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findByFilter(userActiveFilter);
+
+            String[] headers = {"Id", "Role", "Type"};
+            List<String[]> rows = assignments.stream()
+                    .map(a -> new String[]{a.assignmentId(), a.role().getName(), a.assignmentType()})
+                    .toList();
+            System.out.println(FormatUtils.formatTable(headers, rows));
+
+            List<String> assignedRoleName = assignments.stream()
+                   .map(a -> a.role().getName())
+                   .toList();
+            String choice = ConsoleUtils.promptChoice(scanner, "Select assignment to revoke: ", assignedRoleName);
+
+            AssignmentFilter roleFilter = AssignmentFilters.byRoleName(choice);
+            RoleAssignment selected = assignments.stream()
+                   .filter(roleFilter::test)
+                   .toList()
+                   .getFirst();
+
+            boolean confirm = ConsoleUtils.promptYesNo(scanner, "Are you sure?");
+
+            if(!confirm) return;
+
+            rbacSystem.getAssignmentManager().revokeAssignment(selected.assignmentId());
+            System.out.println("Assignment revoked");
+            auditLog.log("REVOKE_ASSIGN_ROLE", rbacSystem.getCurrentUser(), "assignments", "assign revoke success");
+        });
+
+        commandParser.registerCommand("assign-list", "Get list of assignments",
+                (scanner, rbacSystem) -> {
+            List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findAll();
+
+            System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
+        });
+
+        commandParser.registerCommand("assign-list-user", "Get list of users assignments",
+                (scanner, rbacSystem) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+            User user = rbacSystem.getUserManager().findByUsername(username)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
+
+            AssignmentFilter userFilter = AssignmentFilters.byUsername(user.username());
+            List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findByFilter(userFilter);
+
+            System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
+        });
+
+        commandParser.registerCommand("assign-list-role", "Get list of users by role",
+                (scanner, rbacSystem) -> {
+            String roleName = ConsoleUtils.promptString(scanner, "Enter role name: ", true);
+            Role role = rbacSystem.getRoleManager().findByName(roleName)
+                    .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(roleName)));
+
+            AssignmentFilter roleFilter = AssignmentFilters.byRole(role);
+            List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findByFilter(roleFilter);
+
+            System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
+        });
+
+        commandParser.registerCommand("assign-list-active", "Get list of active assignments",
+                (scanner, rbacSystem) -> {
+            AssignmentFilter activeFilter = AssignmentFilters.activeOnly();
+            List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findByFilter(activeFilter);
+
+            System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
+        });
+
+        commandParser.registerCommand("assign-list-expired", "Get list of expired assignments",
+                (scanner, rbacSystem) -> {
+            AssignmentFilter expiredFilter = AssignmentFilters.expiringBefore(DateUtils.getCurrentDate());
+            List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findByFilter(expiredFilter);
+
+            System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
+        });
+
+        commandParser.registerCommand("assign-extend", "Extend role assignment",
+                (scanner, rbacSystem) -> {
+            String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+            String roleName = ConsoleUtils.promptString(scanner, "Enter role name: ", true);
+
+            AssignmentFilter roleUserFilter = AssignmentFilters.byRoleName(roleName)
+                    .and(AssignmentFilters.byUsername(username));
+
+            RoleAssignment assignment = rbacSystem.getAssignmentManager().findByFilter(roleUserFilter).getFirst();
+
+            if(assignment == null)
+                throw new NoSuchElementException(
+                        String.format("Assignment not found by username \"%s\" and role name \"%s\"", username, roleName));
+
+            if(assignment.assignmentType().equals("PERMANENT")) {
+                System.out.println("Can't extend permanents assignment!");
+                return;
+            }
+
+            String newExpiresAt = ConsoleUtils.promptString(scanner, "Enter new expires at (yyyy-mm-dd): ", true);
+            rbacSystem.getAssignmentManager().extendTemporaryAssignment(assignment.assignmentId(), newExpiresAt);
+            System.out.println("Success extend!");
+        });
+
+        commandParser.registerCommand("assign-search", "Search assignments by selected method",
+                (scanner, rbacSystem) -> {
+            List<String> options = Arrays.asList("By user", "By role", "By type", "By status",
+                    "Assigned after date", "Expired before date");
+            String choice = ConsoleUtils.promptChoice(scanner, "Select search method:", options);
+
+            List<RoleAssignment> assignments = new ArrayList<>();
+
+            if(options.get(0).equals(choice)) {
+                String username = ConsoleUtils.promptString(scanner, "Enter username: ", true);
+                User user = rbacSystem.getUserManager().findByUsername(username)
+                        .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getUserNotFound(username)));
+
+                assignments = rbacSystem.getAssignmentManager().findByUser(user);
+            }
+
+            if(options.get(1).equals(choice)) {
+                String roleName = ConsoleUtils.promptString(scanner, "Enter role name: ", true);
+                Role role = rbacSystem.getRoleManager().findByName(roleName)
+                        .orElseThrow(() -> new NoSuchElementException(CommandRegistryHelper.getRoleNotFound(roleName)));
+
+                assignments = rbacSystem.getAssignmentManager().findByRole(role);
+            }
+
+            if(options.get(2).equals(choice)) {
+                String type = ConsoleUtils.promptString(scanner, "Enter type (permanent|temporary):", true);
+                if (!(type.equals("permanent") || type.equals("temporary")))
+                    throw new IllegalArgumentException("Please use [permanent] or [temporary] parameter!");
+
+                AssignmentFilter typeFilter = AssignmentFilters.byType(type);
+                assignments = rbacSystem.getAssignmentManager().findByFilter(typeFilter);
+            }
+
+            if(options.get(3).equals(choice)) {
+                String status = ConsoleUtils.promptString(scanner, "Enter status (active|inactive): ", true);
+                if (!(status.equals("active") || status.equals("inactive")))
+                    throw new IllegalArgumentException("Please use [active] or [inactive] parameter!");
+
+                boolean isActive = status.equals("active");
+                AssignmentFilter statusFilter = isActive ?
+                        AssignmentFilters.activeOnly() : AssignmentFilters.inactiveOnly();
+                assignments = rbacSystem.getAssignmentManager().findByFilter(statusFilter);
+            }
+
+            if(options.get(4).equals(choice)) {
+                String date = ConsoleUtils.promptString(scanner, "Enter date (yyyy-mm-dd): ", true);
+
+                AssignmentFilter dateFilter = AssignmentFilters.assignedAfter(date);
+                assignments = rbacSystem.getAssignmentManager().findByFilter(dateFilter);
+            }
+
+            if(options.get(5).equals(choice)) {
+                String date = ConsoleUtils.promptString(scanner, "Enter date (yyyy-mm-dd): ", true);
+
+                AssignmentFilter dateFilter = AssignmentFilters.expiringBefore(date);
+                assignments = rbacSystem.getAssignmentManager().findByFilter(dateFilter);
+            }
+
+            System.out.println(CommandRegistryHelper.getAssignmentsTable(assignments));
         });
     }
 
