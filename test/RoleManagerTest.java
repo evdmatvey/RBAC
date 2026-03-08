@@ -1,4 +1,11 @@
+import entities.Permission;
+import entities.Role;
+import filters.RoleFilter;
+import filters.RoleFilters;
 import org.junit.jupiter.api.*;
+import repositories.RoleManager;
+import sorters.RoleSorters;
+
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 
@@ -13,7 +20,7 @@ class RoleManagerTest {
     void setUp() {
         roleManager = new RoleManager();
         adminRole = new Role("admin", "Administrator");
-        userRole = new Role("user", "Regular User");
+        userRole = new Role("user", "Regular entities.User");
         readPermission = new Permission("read", "data", "can read");
         writePermission = new Permission("write", "data", "can write");
     }
