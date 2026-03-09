@@ -1,9 +1,4 @@
-import entities.User;
-import filters.UserFilter;
-import filters.UserFilters;
 import org.junit.jupiter.api.*;
-import repositories.UserManager;
-
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 

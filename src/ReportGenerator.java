@@ -1,7 +1,3 @@
-import entities.*;
-import repositories.*;
-import utils.ValidationUtils;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -59,7 +55,7 @@ public class ReportGenerator {
 
         for (Role role : roles) {
             report.append("------------------------------------------------------------\n");
-            report.append(String.format("entities.Role: %s [ID: %s]\n", role.getName(), role.getId()));
+            report.append(String.format("Role: %s [ID: %s]\n", role.getName(), role.getId()));
             report.append(String.format("Description: %s\n", role.getDescription()));
 
             List<RoleAssignment> assignments = assignmentManager.findByRole(role);
@@ -113,7 +109,7 @@ public class ReportGenerator {
 
         List<String> resourceList = new ArrayList<>(allResources);
 
-        matrix.append(String.format("%-20s", "entities.User"));
+        matrix.append(String.format("%-20s", "User"));
         for (String resource : resourceList) {
             matrix.append(String.format(" | %-15s", resource));
         }
