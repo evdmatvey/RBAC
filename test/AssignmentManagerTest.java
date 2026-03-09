@@ -1,11 +1,4 @@
-import entities.*;
-import filters.AssignmentFilter;
-import filters.AssignmentFilters;
 import org.junit.jupiter.api.*;
-import repositories.AssignmentManager;
-import repositories.RoleManager;
-import repositories.UserManager;
-
 import static org.junit.jupiter.api.Assertions.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -55,7 +48,7 @@ class AssignmentManagerTest {
     void addAssignmentWithNonExistentUser() {
         Role role = new Role("admin", "Administrator");
         roleManager.add(role);
-        User fakeUser = User.create("fake", "Fake entities.User", "fake@email.com");
+        User fakeUser = User.create("fake", "Fake User", "fake@email.com");
         PermanentAssignment assignment = new PermanentAssignment(fakeUser, role, metadata);
 
         assertThrows(IllegalArgumentException.class, () -> assignmentManager.add(assignment));
@@ -63,7 +56,7 @@ class AssignmentManagerTest {
 
     @Test
     void addAssignmentWithNonExistentRole() {
-        Role fakeRole = new Role("fake", "Fake entities.Role");
+        Role fakeRole = new Role("fake", "Fake Role");
         PermanentAssignment assignment = new PermanentAssignment(user, fakeRole, metadata);
 
         assertThrows(IllegalArgumentException.class, () -> assignmentManager.add(assignment));
@@ -95,7 +88,7 @@ class AssignmentManagerTest {
     @Test
     void findByUser() {
         Role role1 = new Role("admin", "Administrator");
-        Role role2 = new Role("user", "entities.User");
+        Role role2 = new Role("user", "User");
         roleManager.add(role1);
         roleManager.add(role2);
 
@@ -123,7 +116,7 @@ class AssignmentManagerTest {
     @Test
     void findAll() {
         Role role1 = new Role("admin", "Administrator");
-        Role role2 = new Role("user", "entities.User");
+        Role role2 = new Role("user", "User");
         roleManager.add(role1);
         roleManager.add(role2);
 
@@ -151,7 +144,7 @@ class AssignmentManagerTest {
     @Test
     void clear() {
         Role role1 = new Role("admin", "Administrator");
-        Role role2 = new Role("user", "entities.User");
+        Role role2 = new Role("user", "User");
         roleManager.add(role1);
         roleManager.add(role2);
 
@@ -167,7 +160,7 @@ class AssignmentManagerTest {
     @Test
     void findByFilter() {
         Role role1 = new Role("admin", "Administrator");
-        Role role2 = new Role("user", "entities.User");
+        Role role2 = new Role("user", "User");
         roleManager.add(role1);
         roleManager.add(role2);
 
@@ -187,7 +180,7 @@ class AssignmentManagerTest {
     @Test
     void getActiveAssignments() {
         Role role1 = new Role("admin", "Administrator");
-        Role role2 = new Role("user", "entities.User");
+        Role role2 = new Role("user", "User");
         roleManager.add(role1);
         roleManager.add(role2);
 
