@@ -1,6 +1,7 @@
+package utils;
+
 import entities.*;
 import repositories.*;
-import utils.ValidationUtils;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -8,7 +9,6 @@ import java.io.IOException;
 import java.util.*;
 
 public class ReportGenerator {
-
     public String generateUserReport(UserManager userManager, AssignmentManager assignmentManager) {
         if (userManager == null || assignmentManager == null) {
             throw new IllegalArgumentException("Managers cannot be null");
@@ -17,30 +17,37 @@ public class ReportGenerator {
         StringBuilder report = new StringBuilder();
         List<User> users = userManager.findAll();
 
-        report.append("USER REPORT\n");
+        report.append(FormatUtils.formatHeader("Users report"));
         report.append(String.format("Total users: %d\n\n", users.size()));
 
         for (User user : users) {
-            report.append("------------------------------------------------------------\n");
-            report.append(user.format()).append("\n");
+            report.append(FormatUtils.formatBox(user.format()));
 
             List<RoleAssignment> assignments = assignmentManager.findByUser(user);
+
             if (assignments.isEmpty()) {
-                report.append("  Roles: not assigned\n");
+                report.append("  Roles: not assigned\n\n");
             } else {
                 report.append("  Roles:\n");
+
+                String[] roleHeaders = {"Role", "Status", "Type"};
+                List<String[]> roleRows = new ArrayList<>();
+
                 for (RoleAssignment assignment : assignments) {
                     String status = assignment.isActive() ? "ACTIVE" : "INACTIVE";
-                    String roleInfo = String.format("    - %s (%s)",
-                            assignment.role().getName(), status);
-                    report.append(roleInfo).append("\n");
+                    String type = (assignment instanceof TemporaryAssignment)
+                            ? "Temporary" : "Permanent";
 
-                    if (assignment instanceof TemporaryAssignment) {
-                        report.append("      Temporary assignment\n");
-                    }
+                    roleRows.add(new String[]{
+                            assignment.role().getName(),
+                            status,
+                            type
+                    });
                 }
+
+                report.append(FormatUtils.formatTable(roleHeaders, roleRows));
+                report.append("\n");
             }
-            report.append("\n");
         }
 
         return report.toString();
@@ -54,30 +61,48 @@ public class ReportGenerator {
         StringBuilder report = new StringBuilder();
         List<Role> roles = roleManager.findAll();
 
-        report.append("ROLE REPORT\n");
+        report.append(FormatUtils.formatHeader("Role report"));
         report.append(String.format("Total roles: %d\n\n", roles.size()));
 
         for (Role role : roles) {
-            report.append("------------------------------------------------------------\n");
-            report.append(String.format("entities.Role: %s [ID: %s]\n", role.getName(), role.getId()));
-            report.append(String.format("Description: %s\n", role.getDescription()));
-
             List<RoleAssignment> assignments = assignmentManager.findByRole(role);
             long activeAssignments = assignments.stream()
                     .filter(RoleAssignment::isActive)
                     .count();
 
-            report.append(String.format("Assignments: %d (active: %d)\n",
-                    assignments.size(), activeAssignments));
-
             Set<Permission> permissions = role.getPermissions();
-            report.append(String.format("Permissions: %d\n", permissions.size()));
+
+            String[] headers = {"Property", "Value"};
+            List<String[]> rows = new ArrayList<>();
+
+            rows.add(new String[]{"Role ID", role.getId()});
+            rows.add(new String[]{"Role Name", role.getName()});
+            rows.add(new String[]{"Description", role.getDescription()});
+            rows.add(new String[]{"Total Assignments", String.valueOf(assignments.size())});
+            rows.add(new String[]{"Active Assignments", String.valueOf(activeAssignments)});
+            rows.add(new String[]{"Total Permissions", String.valueOf(permissions.size())});
+
+            report.append(FormatUtils.formatTable(headers, rows));
 
             if (!permissions.isEmpty()) {
-                report.append("  Permissions:\n");
+                report.append(FormatUtils.padLeft("Permissions:", 4));
+                report.append("\n");
+
+                String[] permHeaders = {"Permission", "Resource", "Description"};
+                List<String[]> permRows = new ArrayList<>();
+
                 for (Permission permission : permissions) {
-                    report.append("    - ").append(permission.format()).append("\n");
+                    permRows.add(new String[]{
+                            permission.name(),
+                            permission.resource(),
+                            FormatUtils.truncate(permission.description(), 40)
+                    });
                 }
+
+                report.append(FormatUtils.formatTable(permHeaders, permRows));
+            } else {
+                report.append(FormatUtils.padLeft("No permissions assigned", 4));
+                report.append("\n");
             }
 
             report.append("\n");
@@ -94,7 +119,7 @@ public class ReportGenerator {
         StringBuilder matrix = new StringBuilder();
         List<User> users = userManager.findAll();
 
-        matrix.append("PERMISSION MATRIX\n\n");
+        matrix.append(FormatUtils.formatHeader("Permission Matrix"));
 
         Set<String> allResources = new TreeSet<>();
         Map<String, Set<String>> userPermissions = new HashMap<>();
@@ -113,37 +138,53 @@ public class ReportGenerator {
 
         List<String> resourceList = new ArrayList<>(allResources);
 
-        matrix.append(String.format("%-20s", "entities.User"));
-        for (String resource : resourceList) {
-            matrix.append(String.format(" | %-15s", resource));
+        String[] headers = new String[resourceList.size() + 1];
+        headers[0] = "User";
+        for (int i = 0; i < resourceList.size(); i++) {
+            headers[i + 1] = resourceList.get(i);
         }
-        matrix.append("\n");
-        matrix.append("-".repeat(20 + resourceList.size() * 18)).append("\n");
+
+        List<String[]> rows = new ArrayList<>();
 
         for (User user : users) {
-            matrix.append(String.format("%-20s", user.username()));
+            String[] row = new String[resourceList.size() + 1];
+            row[0] = user.username();
 
-            for (String resource : resourceList) {
+            for (int i = 0; i < resourceList.size(); i++) {
+                String resource = resourceList.get(i);
                 Set<String> perms = userPermissions.get(user.username());
                 boolean hasAccess = false;
                 if (perms != null) {
                     hasAccess = perms.stream().anyMatch(p -> p.startsWith(resource + ":"));
                 }
-                matrix.append(String.format(" | %-15s", hasAccess ? "✓" : "✗"));
+                row[i + 1] = hasAccess ? "yes" : "no";
             }
-            matrix.append("\n");
+            rows.add(row);
         }
 
-        matrix.append("\n").append("Detailed information:\n");
-        matrix.append("-".repeat(60)).append("\n");
+        matrix.append(FormatUtils.formatTable(headers, rows));
+        matrix.append("\n");
+
+        matrix.append(FormatUtils.formatHeader("DETAILED PERMISSIONS"));
 
         for (User user : users) {
             Set<Permission> permissions = assignmentManager.getUserPermissions(user);
             if (!permissions.isEmpty()) {
-                matrix.append(user.username()).append(":\n");
+                matrix.append(FormatUtils.formatBox(user.username()));
+
+                String[] permHeaders = {"Permission", "Resource", "Description"};
+                List<String[]> permRows = new ArrayList<>();
+
                 for (Permission permission : permissions) {
-                    matrix.append("  - ").append(permission.format()).append("\n");
+                    permRows.add(new String[]{
+                            permission.name(),
+                            permission.resource(),
+                            FormatUtils.truncate(permission.description(), 50)
+                    });
                 }
+
+                matrix.append(FormatUtils.formatTable(permHeaders, permRows));
+                matrix.append("\n");
             }
         }
 

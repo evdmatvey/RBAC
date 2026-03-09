@@ -7,12 +7,14 @@ import repositories.UserManager;
 import utils.ConsoleUtils;
 import utils.DateUtils;
 import utils.FormatUtils;
+import utils.ReportGenerator;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class CommandRegistry {
-    private static AuditLog auditLog = new AuditLog();
+    private final static AuditLog auditLog = new AuditLog();
+    private final static ReportGenerator reportGenerator = new ReportGenerator();
 
     public static void setupCommands(CommandParser commandParser) {
         setupUserManageCommands(commandParser);
@@ -677,6 +679,24 @@ public class CommandRegistry {
         commandParser.registerCommand("audit-log", "Show audit log",
                 (scanner, rbacSystem) -> {
             auditLog.printLog();
+        });
+
+        commandParser.registerCommand("report-users", "Get report by users",
+                (scanner, rbacSystem) -> {
+            System.out.println(reportGenerator.generateUserReport(rbacSystem.getUserManager(),
+                    rbacSystem.getAssignmentManager()));
+        });
+
+        commandParser.registerCommand("report-roles", "Get report by roles",
+                (scanner, rbacSystem) -> {
+            System.out.println(reportGenerator.generateRoleReport(rbacSystem.getRoleManager(),
+                    rbacSystem.getAssignmentManager()));
+        });
+
+        commandParser.registerCommand("report-matrix", "Get report by users x resources",
+                (scanner, rbacSystem) -> {
+            System.out.println(reportGenerator.generatePermissionMatrix(rbacSystem.getUserManager(),
+                    rbacSystem.getAssignmentManager()));
         });
     }
 }
