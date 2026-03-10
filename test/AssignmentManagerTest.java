@@ -5,6 +5,7 @@ import org.junit.jupiter.api.*;
 import repositories.AssignmentManager;
 import repositories.RoleManager;
 import repositories.UserManager;
+import utils.DateUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.time.LocalDateTime;
@@ -193,7 +194,7 @@ class AssignmentManagerTest {
 
         PermanentAssignment assignment1 = new PermanentAssignment(user, role1, metadata);
 
-        String futureDate = LocalDateTime.now().plusDays(30).toString();
+        String futureDate = "2026-10-10";
         AssignmentMetadata metadataWithExpiry = new AssignmentMetadata(
                 "admin",
                 LocalDateTime.now().toString(),
@@ -283,7 +284,7 @@ class AssignmentManagerTest {
         TemporaryAssignment assignment = new TemporaryAssignment(user, role, metadata);
 
         assignmentManager.add(assignment);
-        String newDate = LocalDateTime.now().plusDays(30).toString();
+        String newDate = "2026-10-10";
 
         assertDoesNotThrow(() ->
                 assignmentManager.extendTemporaryAssignment(assignment.assignmentId(), newDate));
