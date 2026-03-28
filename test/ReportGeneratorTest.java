@@ -1,10 +1,16 @@
 import utils.*;
-
 import repositories.*;
 import entities.*;
+import filters.UserFilter;
+import filters.UserFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ReportGeneratorTest {
@@ -136,6 +142,221 @@ class ReportGeneratorTest {
         assertTrue(report.contains("file"));
         assertTrue(report.contains("yes"));
         assertFalse(report.contains("no"));
+    }
+
+    @Test
+    @DisplayName("Should generate user report using parallel stream")
+    void generateUserReportParallel_Success_ReturnsFormattedReport() {
+        AssignmentMetadata am = AssignmentMetadata.now("Me", "Test");
+        RoleAssignment assignment = new PermanentAssignment(testUser, testRole, am);
+        assignmentManager.add(assignment);
+
+        String report = reportGenerator.generateUserReportParallel(userManager, assignmentManager);
+
+        assertNotNull(report);
+        assertTrue(report.contains("Users report (Parallel)"));
+        assertTrue(report.contains("john_doe"));
+        assertTrue(report.contains("Admin"));
+        assertTrue(report.contains("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("Should generate user report parallel with null managers throws exception")
+    void generateUserReportParallel_WithNullManagers_ThrowsException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> reportGenerator.generateUserReportParallel(null, assignmentManager));
+        assertThrows(IllegalArgumentException.class,
+                () -> reportGenerator.generateUserReportParallel(userManager, null));
+    }
+
+    @Test
+    @DisplayName("Should generate user report parallel with multiple users")
+    void generateUserReportParallel_WithMultipleUsers_ReturnsCompleteReport() {
+        for (int i = 0; i < 50; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            userManager.add(user);
+
+            Role role = new Role("ROLE_" + i, "Role " + i);
+            roleManager.add(role);
+
+            AssignmentMetadata am = AssignmentMetadata.now("admin", "Test");
+            RoleAssignment assignment = new PermanentAssignment(user, role, am);
+            assignmentManager.add(assignment);
+        }
+
+        String report = reportGenerator.generateUserReportParallel(userManager, assignmentManager);
+
+        assertNotNull(report);
+        assertTrue(report.contains("Users report (Parallel)"));
+        assertTrue(report.contains("Total users: 51"));
+    }
+
+    @Test
+    @DisplayName("Should generate permission matrix using parallel stream")
+    void generatePermissionMatrixParallel_Success_ReturnsFormattedMatrix() {
+        AssignmentMetadata am = AssignmentMetadata.now("Me", "Test");
+        RoleAssignment assignment = new PermanentAssignment(testUser, testRole, am);
+        assignmentManager.add(assignment);
+
+        String report = reportGenerator.generatePermissionMatrixParallel(userManager, assignmentManager);
+
+        assertNotNull(report);
+        assertTrue(report.contains("Permission Matrix (Parallel)"));
+        assertTrue(report.contains("john_doe"));
+        assertTrue(report.contains("file"));
+    }
+
+    @Test
+    @DisplayName("Should generate permission matrix parallel with null managers throws exception")
+    void generatePermissionMatrixParallel_WithNullManagers_ThrowsException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> reportGenerator.generatePermissionMatrixParallel(null, assignmentManager));
+        assertThrows(IllegalArgumentException.class,
+                () -> reportGenerator.generatePermissionMatrixParallel(userManager, null));
+    }
+
+    @Test
+    @DisplayName("Should generate permission matrix parallel with multiple users")
+    void generatePermissionMatrixParallel_WithMultipleUsers_ReturnsCompleteMatrix() {
+        for (int i = 0; i < 30; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            userManager.add(user);
+
+            Permission permission = new Permission("perm_" + i, "resource_" + i, "Test permission");
+            Role role = new Role("ROLE_" + i, "Role " + i);
+            role.addPermission(permission);
+            roleManager.add(role);
+
+            AssignmentMetadata am = AssignmentMetadata.now("admin", "Test");
+            RoleAssignment assignment = new PermanentAssignment(user, role, am);
+            assignmentManager.add(assignment);
+        }
+
+        String report = reportGenerator.generatePermissionMatrixParallel(userManager, assignmentManager);
+
+        assertNotNull(report);
+        assertTrue(report.contains("Permission Matrix (Parallel)"));
+        assertTrue(report.contains("DETAILED PERMISSIONS"));
+    }
+
+    @Test
+    @DisplayName("Should find users by filter using parallel stream")
+    void findByFilterParallel_WithPredicate_ReturnsFilteredUsers() {
+        for (int i = 0; i < 100; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            userManager.add(user);
+        }
+
+        List<User> filteredUsers = reportGenerator.findByFilterParallel(
+                userManager,
+                user -> user.username().contains("50")
+        );
+
+        assertNotNull(filteredUsers);
+        assertTrue(filteredUsers.size() >= 1);
+        assertTrue(filteredUsers.stream().allMatch(u -> u.username().contains("50")));
+    }
+
+    @Test
+    @DisplayName("Should find users by user filter using parallel stream")
+    void findByUserFilterParallel_WithUserFilter_ReturnsFilteredUsers() {
+        for (int i = 0; i < 100; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            userManager.add(user);
+        }
+
+        UserFilter filter = UserFilters.byUsernameContains("75");
+        List<User> filteredUsers = reportGenerator.findByUserFilterParallel(userManager, filter);
+
+        assertNotNull(filteredUsers);
+        assertTrue(filteredUsers.size() >= 1);
+        assertTrue(filteredUsers.stream().allMatch(u -> u.username().contains("75")));
+    }
+
+    @Test
+    @DisplayName("Should find users by user filter parallel with null filter returns all users")
+    void findByUserFilterParallel_WithNullUserFilter_ReturnsAllUsers() {
+        for (int i = 0; i < 50; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            userManager.add(user);
+        }
+
+        List<User> users = reportGenerator.findByUserFilterParallel(userManager, null);
+
+        assertNotNull(users);
+        assertEquals(51, users.size());
+    }
+
+    @Test
+    @DisplayName("Should handle concurrent parallel report generation")
+    void testConcurrentParallelReportGeneration() throws InterruptedException {
+        for (int i = 0; i < 100; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            userManager.add(user);
+
+            Role role = new Role("ROLE_" + i, "Role " + i);
+            roleManager.add(role);
+
+            AssignmentMetadata am = AssignmentMetadata.now("admin", "Test");
+            RoleAssignment assignment = new PermanentAssignment(user, role, am);
+            assignmentManager.add(assignment);
+        }
+
+        int threadCount = 10;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+        AtomicInteger successCount = new AtomicInteger(0);
+
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    String userReport = reportGenerator.generateUserReportParallel(userManager, assignmentManager);
+                    String matrixReport = reportGenerator.generatePermissionMatrixParallel(userManager, assignmentManager);
+
+                    assertNotNull(userReport);
+                    assertNotNull(matrixReport);
+                    assertTrue(userReport.contains("Users report (Parallel)"));
+                    assertTrue(matrixReport.contains("Permission Matrix (Parallel)"));
+
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    fail("Exception in parallel report generation: " + e.getMessage());
+                }
+                latch.countDown();
+            });
+        }
+
+        assertTrue(latch.await(30, TimeUnit.SECONDS));
+        executor.shutdown();
+        assertEquals(threadCount, successCount.get());
+    }
+
+    @Test
+    @DisplayName("Should handle empty user list in parallel reports")
+    void testParallelReportsWithEmptyUserList() {
+        userManager.clear();
+
+        String userReport = reportGenerator.generateUserReportParallel(userManager, assignmentManager);
+        String matrixReport = reportGenerator.generatePermissionMatrixParallel(userManager, assignmentManager);
+
+        assertNotNull(userReport);
+        assertNotNull(matrixReport);
+        assertTrue(userReport.contains("Total users: 0"));
+        assertTrue(matrixReport.contains("Permission Matrix (Parallel)"));
+    }
+
+    @Test
+    @DisplayName("Should handle findByFilterParallel with null UserManager")
+    void testFindByFilterParallelWithNullUserManager() {
+        assertThrows(IllegalArgumentException.class,
+                () -> reportGenerator.findByFilterParallel(null, user -> true));
+    }
+
+    @Test
+    @DisplayName("Should handle findByUserFilterParallel with null UserManager")
+    void testFindByUserFilterParallelWithNullUserManager() {
+        assertThrows(IllegalArgumentException.class,
+                () -> reportGenerator.findByUserFilterParallel(null, UserFilters.byUsernameContains("test")));
     }
 
     @Test

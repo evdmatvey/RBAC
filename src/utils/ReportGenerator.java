@@ -1,14 +1,18 @@
 package utils;
 
 import entities.*;
+import filters.UserFilter;
 import repositories.*;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class ReportGenerator {
+
     public String generateUserReport(UserManager userManager, AssignmentManager assignmentManager) {
         if (userManager == null || assignmentManager == null) {
             throw new IllegalArgumentException("Managers cannot be null");
@@ -201,5 +205,143 @@ public class ReportGenerator {
         } catch (IOException e) {
             System.err.println("Error saving report: " + e.getMessage());
         }
+    }
+
+    public String generateUserReportParallel(UserManager userManager, AssignmentManager assignmentManager) {
+        if (userManager == null || assignmentManager == null) {
+            throw new IllegalArgumentException("Managers cannot be null");
+        }
+
+        List<User> users = userManager.findAllParallel();
+
+        StringBuilder report = new StringBuilder();
+        report.append(FormatUtils.formatHeader("Users report (Parallel)"));
+        report.append(String.format("Total users: %d\n\n", users.size()));
+
+        for (User user : users) {
+            report.append(FormatUtils.formatBox(user.format()));
+
+            List<RoleAssignment> assignments = assignmentManager.findByUserParallel(user);
+
+            if (assignments.isEmpty()) {
+                report.append("  Roles: not assigned\n\n");
+            } else {
+                report.append("  Roles:\n");
+
+                String[] roleHeaders = {"Role", "Status", "Type"};
+                List<String[]> roleRows = new ArrayList<>();
+
+                for (RoleAssignment assignment : assignments) {
+                    String status = assignment.isActive() ? "ACTIVE" : "INACTIVE";
+                    String type = (assignment instanceof TemporaryAssignment)
+                            ? "Temporary" : "Permanent";
+
+                    roleRows.add(new String[]{
+                            assignment.role().getName(),
+                            status,
+                            type
+                    });
+                }
+
+                report.append(FormatUtils.formatTable(roleHeaders, roleRows));
+                report.append("\n");
+            }
+        }
+
+        return report.toString();
+    }
+
+    public String generatePermissionMatrixParallel(UserManager userManager, AssignmentManager assignmentManager) {
+        if (userManager == null || assignmentManager == null) {
+            throw new IllegalArgumentException("Managers cannot be null");
+        }
+
+        List<User> users = userManager.findAllParallel();
+
+        Set<String> allResources = new TreeSet<>();
+        Map<String, Set<String>> userPermissions = new HashMap<>();
+
+        for (User user : users) {
+            Set<Permission> permissions = assignmentManager.getUserPermissionsParallel(user);
+            Set<String> userResourcePerms = new TreeSet<>();
+
+            for (Permission permission : permissions) {
+                String resource = permission.resource();
+                allResources.add(resource);
+                userResourcePerms.add(resource + ":" + permission.name());
+            }
+            userPermissions.put(user.username(), userResourcePerms);
+        }
+
+        List<String> resourceList = new ArrayList<>(allResources);
+
+        StringBuilder matrix = new StringBuilder();
+        matrix.append(FormatUtils.formatHeader("Permission Matrix (Parallel)"));
+
+        String[] headers = new String[resourceList.size() + 1];
+        headers[0] = "User";
+        for (int i = 0; i < resourceList.size(); i++) {
+            headers[i + 1] = resourceList.get(i);
+        }
+
+        List<String[]> rows = new ArrayList<>();
+
+        for (User user : users) {
+            String[] row = new String[resourceList.size() + 1];
+            row[0] = user.username();
+
+            for (int i = 0; i < resourceList.size(); i++) {
+                String resource = resourceList.get(i);
+                Set<String> perms = userPermissions.get(user.username());
+                boolean hasAccess = false;
+                if (perms != null) {
+                    hasAccess = perms.stream().anyMatch(p -> p.startsWith(resource + ":"));
+                }
+                row[i + 1] = hasAccess ? "yes" : "no";
+            }
+            rows.add(row);
+        }
+
+        matrix.append(FormatUtils.formatTable(headers, rows));
+        matrix.append("\n");
+
+        matrix.append(FormatUtils.formatHeader("DETAILED PERMISSIONS"));
+
+        for (User user : users) {
+            Set<Permission> permissions = assignmentManager.getUserPermissionsParallel(user);
+            if (!permissions.isEmpty()) {
+                matrix.append(FormatUtils.formatBox(user.username()));
+
+                String[] permHeaders = {"Permission", "Resource", "Description"};
+                List<String[]> permRows = new ArrayList<>();
+
+                for (Permission permission : permissions) {
+                    permRows.add(new String[]{
+                            permission.name(),
+                            permission.resource(),
+                            FormatUtils.truncate(permission.description(), 50)
+                    });
+                }
+
+                matrix.append(FormatUtils.formatTable(permHeaders, permRows));
+                matrix.append("\n");
+            }
+        }
+
+        return matrix.toString();
+    }
+
+    public List<User> findByFilterParallel(UserManager userManager, Predicate<User> filter) {
+        if (userManager == null) {
+            throw new IllegalArgumentException("UserManager cannot be null");
+        }
+        return userManager.findByFilterParallel(filter);
+    }
+
+    public List<User> findByUserFilterParallel(UserManager userManager, UserFilter filter) {
+        if (userManager == null) {
+            throw new IllegalArgumentException("UserManager cannot be null");
+        }
+        return userManager.findByFilterParallel(filter);
     }
 }

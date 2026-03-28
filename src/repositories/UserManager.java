@@ -7,6 +7,7 @@ import filters.UserFilters;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -63,6 +64,15 @@ public class UserManager implements Repository<User> {
         }
     }
 
+    public List<User> findAllParallel() {
+        lock.readLock().lock();
+        try {
+            return users.values().parallelStream().collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     @Override
     public int count() {
         lock.readLock().lock();
@@ -114,6 +124,36 @@ public class UserManager implements Repository<User> {
         lock.readLock().lock();
         try {
             return users.values().stream()
+                    .filter(filter::test)
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<User> findByFilterParallel(Predicate<User> filter) {
+        if (filter == null) {
+            return findAllParallel();
+        }
+
+        lock.readLock().lock();
+        try {
+            return users.values().parallelStream()
+                    .filter(filter)
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<User> findByFilterParallel(UserFilter filter) {
+        if (filter == null) {
+            return findAllParallel();
+        }
+
+        lock.readLock().lock();
+        try {
+            return users.values().parallelStream()
                     .filter(filter::test)
                     .collect(Collectors.toList());
         } finally {

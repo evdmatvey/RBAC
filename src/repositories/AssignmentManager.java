@@ -85,6 +85,15 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         }
     }
 
+    public List<RoleAssignment> findAllParallel() {
+        lock.readLock().lock();
+        try {
+            return assignments.values().parallelStream().collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     @Override
     public int count() {
         lock.readLock().lock();
@@ -119,6 +128,20 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         }
     }
 
+    public List<RoleAssignment> findByUserParallel(User user) {
+        if (user == null) {
+            return Collections.emptyList();
+        }
+        lock.readLock().lock();
+        try {
+            return assignments.values().parallelStream()
+                    .filter(a -> a.user().equals(user))
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     public List<RoleAssignment> findByRole(Role role) {
         if (role == null) {
             return Collections.emptyList();
@@ -133,6 +156,20 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         }
     }
 
+    public List<RoleAssignment> findByRoleParallel(Role role) {
+        if (role == null) {
+            return Collections.emptyList();
+        }
+        lock.readLock().lock();
+        try {
+            return assignments.values().parallelStream()
+                    .filter(a -> a.role().equals(role))
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     public List<RoleAssignment> findByFilter(AssignmentFilter filter) {
         if (filter == null) {
             return findAll();
@@ -140,6 +177,20 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         lock.readLock().lock();
         try {
             return assignments.values().stream()
+                    .filter(filter::test)
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<RoleAssignment> findByFilterParallel(AssignmentFilter filter) {
+        if (filter == null) {
+            return findAllParallel();
+        }
+        lock.readLock().lock();
+        try {
+            return assignments.values().parallelStream()
                     .filter(filter::test)
                     .collect(Collectors.toList());
         } finally {
@@ -170,6 +221,17 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         lock.readLock().lock();
         try {
             return assignments.values().stream()
+                    .filter(RoleAssignment::isActive)
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<RoleAssignment> getActiveAssignmentsParallel() {
+        lock.readLock().lock();
+        try {
+            return assignments.values().parallelStream()
                     .filter(RoleAssignment::isActive)
                     .collect(Collectors.toList());
         } finally {
@@ -228,6 +290,23 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         lock.readLock().lock();
         try {
             return assignments.values().stream()
+                    .filter(RoleAssignment::isActive)
+                    .filter(a -> a.user().equals(user))
+                    .map(RoleAssignment::role)
+                    .flatMap(role -> role.getPermissions().stream())
+                    .collect(Collectors.toSet());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public Set<Permission> getUserPermissionsParallel(User user) {
+        if (user == null) {
+            return Collections.emptySet();
+        }
+        lock.readLock().lock();
+        try {
+            return assignments.values().parallelStream()
                     .filter(RoleAssignment::isActive)
                     .filter(a -> a.user().equals(user))
                     .map(RoleAssignment::role)

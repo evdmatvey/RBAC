@@ -71,6 +71,15 @@ public class RoleManager implements Repository<Role> {
         }
     }
 
+    public List<Role> findAllParallel() {
+        lock.readLock().lock();
+        try {
+            return rolesById.values().parallelStream().collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
     @Override
     public int count() {
         lock.readLock().lock();
@@ -107,6 +116,21 @@ public class RoleManager implements Repository<Role> {
         lock.readLock().lock();
         try {
             return rolesById.values().stream()
+                    .filter(filter::test)
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public List<Role> findByFilterParallel(RoleFilter filter) {
+        if (filter == null) {
+            return findAllParallel();
+        }
+
+        lock.readLock().lock();
+        try {
+            return rolesById.values().parallelStream()
                     .filter(filter::test)
                     .collect(Collectors.toList());
         } finally {
