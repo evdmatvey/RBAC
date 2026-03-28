@@ -10,10 +10,11 @@ import utils.FormatUtils;
 import utils.ReportGenerator;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 public class CommandRegistry {
-    private final static AuditLog auditLog = new AuditLog();
     private final static ReportGenerator reportGenerator = new ReportGenerator();
 
     public static void setupCommands(CommandParser commandParser) {
@@ -55,7 +56,8 @@ public class CommandRegistry {
             rbacSystem.getUserManager().add(created);
             System.out.println("User created: " + created.format());
 
-            auditLog.log("CREATE_USER", rbacSystem.getCurrentUser(), "users", created.format());
+            rbacSystem.getAsyncAuditLog().log("CREATE_USER", rbacSystem.getCurrentUser(),
+                    "users", created.format());
         });
 
         commandParser.registerCommand("user-view", "Get user information by username",
@@ -115,7 +117,8 @@ public class CommandRegistry {
 
             if (result) {
                 System.out.println("User: " + user.format() + " [deleted]");
-                auditLog.log("DELETE_USER", rbacSystem.getCurrentUser(), "users", user.format());
+                rbacSystem.getAsyncAuditLog().log("DELETE_USER", rbacSystem.getCurrentUser(),
+                        "users", user.format());
             } else {
                 System.out.println("Some errors detected while deleting, try again later [0_o]");
             }
@@ -198,7 +201,8 @@ public class CommandRegistry {
 
             System.out.println("Role created: " + created.compactFormat());
 
-            auditLog.log("CREATE_ROLE", rbacSystem.getCurrentUser(), "roles", created.compactFormat());
+            rbacSystem.getAsyncAuditLog().log("CREATE_ROLE", rbacSystem.getCurrentUser(),
+                    "roles", created.compactFormat());
         });
 
         commandParser.registerCommand("role-view", "Get role information by name",
@@ -240,7 +244,8 @@ public class CommandRegistry {
                 boolean isDeleted = rbacSystem.getRoleManager().remove(role);
                 if(isDeleted){
                     System.out.println(String.format("Role deleted: %s" + role.compactFormat()));
-                    auditLog.log("DELETE_ROLE", rbacSystem.getCurrentUser(), "roles", "delete success");
+                    rbacSystem.getAsyncAuditLog().log("DELETE_ROLE", rbacSystem.getCurrentUser(),
+                            "roles", "delete success");
                 } else {
                     System.out.println("Some issues found while deleting role. Try again later [0-0]");
                 }
@@ -386,7 +391,8 @@ public class CommandRegistry {
             rbacSystem.getAssignmentManager().add(assignment);
 
             System.out.println("Assignment added: " + assignment.summary());
-            auditLog.log("ASSIGN_ROLE", rbacSystem.getCurrentUser(), "assignments", "assign success");
+            rbacSystem.getAsyncAuditLog().log("ASSIGN_ROLE", rbacSystem.getCurrentUser(),
+                    "assignments", "assign success");
         });
 
         commandParser.registerCommand("revoke-role", "Revoke assignment from user by username",
@@ -421,7 +427,8 @@ public class CommandRegistry {
 
             rbacSystem.getAssignmentManager().revokeAssignment(selected.assignmentId());
             System.out.println("Assignment revoked");
-            auditLog.log("REVOKE_ASSIGN_ROLE", rbacSystem.getCurrentUser(), "assignments", "assign revoke success");
+            rbacSystem.getAsyncAuditLog().log("REVOKE_ASSIGN_ROLE", rbacSystem.getCurrentUser(),
+                    "assignments", "assign revoke success");
         });
 
         commandParser.registerCommand("assign-list", "Get list of assignments",
@@ -676,15 +683,94 @@ public class CommandRegistry {
             }
         });
 
-        commandParser.registerCommand("audit-log", "Show audit log",
+        commandParser.registerCommand("report-users-async", "Generate user report asynchronously",
                 (scanner, rbacSystem) -> {
-            auditLog.printLog();
+            System.out.println("🔄 Starting asynchronous user report generation...");
+            long startTime = System.currentTimeMillis();
+
+            rbacSystem.getBackgroundExecutor().submit(() -> {
+                String report = reportGenerator.generateUserReportParallel(
+                        rbacSystem.getUserManager(),
+                        rbacSystem.getAssignmentManager()
+                );
+
+                long duration = System.currentTimeMillis() - startTime;
+
+                synchronized (System.out) {
+                    System.out.println("\n" + FormatUtils.formatHeader("ASYNC USER REPORT (Generated in " + duration + "ms)"));
+                    System.out.println(report);
+                    System.out.println(FormatUtils.formatHeader("END OF REPORT"));
+                }
+
+                rbacSystem.getAsyncAuditLog().log(
+                        "GENERATE_REPORT_ASYNC",
+                        rbacSystem.getCurrentUser(),
+                        "users",
+                        "Generated in " + duration + "ms"
+                );
+            });
+
+            System.out.println("Report generation started in background. You can continue working...");
         });
 
-        commandParser.registerCommand("report-users", "Get report by users",
+        commandParser.registerCommand("save-async", "Save all data to file asynchronously",
                 (scanner, rbacSystem) -> {
-            System.out.println(reportGenerator.generateUserReport(rbacSystem.getUserManager(),
-                    rbacSystem.getAssignmentManager()));
+            String filename = ConsoleUtils.promptString(scanner, "Enter filename to save (e.g., rbac_backup.json): ", true);
+
+            System.out.println("Starting asynchronous data save to: " + filename);
+            long startTime = System.currentTimeMillis();
+
+            class SaveData {
+                java.util.List<User> users = rbacSystem.getUserManager().findAll();
+                java.util.List<Role> roles = rbacSystem.getRoleManager().findAll();
+                java.util.List<RoleAssignment> assignments = rbacSystem.getAssignmentManager().findAll();
+            }
+
+            SaveData saveData = new SaveData();
+
+            CompletableFuture.runAsync(() -> {
+                try {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("=== RBAC SYSTEM BACKUP ===\n");
+                    sb.append("Generated at: ").append(java.time.LocalDateTime.now()).append("\n\n");
+
+                    sb.append("USERS:\n");
+                    for (User u : saveData.users) {
+                        sb.append("  ").append(u.format()).append("\n");
+                    }
+
+                    sb.append("\nROLES:\n");
+                    for (Role r : saveData.roles) {
+                        sb.append("  ").append(r.compactFormat()).append("\n");
+                    }
+
+                    sb.append("\nASSIGNMENTS:\n");
+                    for (RoleAssignment a : saveData.assignments) {
+                        sb.append("  ").append(a.toString()).append("\n");
+                    }
+
+                    java.nio.file.Files.writeString(java.nio.file.Paths.get(filename), sb.toString());
+
+                    long duration = System.currentTimeMillis() - startTime;
+                    System.out.println("Data saved successfully to: " + filename + " (took " + duration + "ms)");
+
+                    rbacSystem.getAsyncAuditLog().log(
+                            "SAVE_DATA_ASYNC",
+                            rbacSystem.getCurrentUser(),
+                            "system",
+                            "Saved to " + filename
+                    );
+                } catch (Exception e) {
+                    System.err.println("Error saving data: " + e.getMessage());
+                }
+            }, (Executor) rbacSystem.getBackgroundExecutor());
+
+            System.out.println("Save operation started in background. You can continue working...");
+        });
+
+        commandParser.registerCommand("audit-log", "Show audit log",
+                (scanner, rbacSystem) -> {
+            rbacSystem.getAsyncAuditLog().printLog();
         });
 
         commandParser.registerCommand("report-roles", "Get report by roles",

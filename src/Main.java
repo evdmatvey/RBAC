@@ -1,8 +1,7 @@
 import commands.CommandParser;
 import commands.CommandRegistry;
 import commands.RBACSystem;
-import entities.*;
-import utils.DateUtils;
+import java.util.Scanner;
 
 void main() {
     RBACSystem rbacSystem = new RBACSystem();
@@ -13,13 +12,26 @@ void main() {
     CommandRegistry.setupCommands(commandParser);
 
     Scanner scanner = new Scanner(System.in);
+
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        System.out.println("\nShutdown signal received. Cleaning up...");
+        rbacSystem.shutdown();
+    }));
+
     while (true) {
-        System.out.println("\n[RBAC]>");
+        System.out.print("\n[RBAC]> ");
         String input = scanner.nextLine();
 
-        if (input.isBlank())
-            continue;
+        if (input.isBlank()) continue;
+
+        if (input.equalsIgnoreCase("exit")) {
+            rbacSystem.shutdown();
+            System.out.println("Goodbye!");
+            break;
+        }
 
         commandParser.parseAndExecute(input, scanner, rbacSystem);
     }
+
+    scanner.close();
 }

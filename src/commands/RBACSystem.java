@@ -2,7 +2,7 @@ package commands;
 
 import entities.*;
 import repositories.*;
-import utils.FormatUtils;
+import utils.*;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -14,10 +14,23 @@ public class RBACSystem {
     private AssignmentManager assignmentManager;
     private String currentUser;
 
+    private BackgroundExecutor backgroundExecutor;
+    private AsyncAuditLog asyncAuditLog;
+
     public RBACSystem() {
-        userManager = new UserManager();
-        roleManager = new RoleManager();
-        assignmentManager = new AssignmentManager(userManager, roleManager);
+        this.userManager = new UserManager();
+        this.roleManager = new RoleManager();
+        this.assignmentManager = new AssignmentManager(userManager, roleManager);
+        this.backgroundExecutor = new BackgroundExecutor();
+        this.asyncAuditLog = new AsyncAuditLog(backgroundExecutor);
+    }
+
+    public BackgroundExecutor getBackgroundExecutor() {
+        return backgroundExecutor;
+    }
+
+    public AsyncAuditLog getAsyncAuditLog() {
+        return asyncAuditLog;
     }
 
     public void setCurrentUser(String username) {
@@ -49,6 +62,14 @@ public class RBACSystem {
 
         createAdmin();
         assignRoleToAdmin();
+
+        asyncAuditLog.log("SYSTEM_INIT", "system", "RBAC", "System initialized");
+    }
+
+    public void shutdown() {
+        asyncAuditLog.log("SYSTEM_SHUTDOWN", currentUser, "system", "Shutting down");
+        backgroundExecutor.shutdown();
+        asyncAuditLog.shutdown();
     }
 
     private ArrayList<Permission> generatePermissions() {
@@ -123,7 +144,7 @@ public class RBACSystem {
 
     public String generateStatistics() {
         String[] headers = {"Name", "Count"};
-        ArrayList<String[]> rows = new ArrayList<>();
+        java.util.ArrayList<String[]> rows = new java.util.ArrayList<>();
 
         rows.add(new String[]{"Users", String.valueOf(userManager.count())});
         rows.add(new String[]{"Roles", String.valueOf(roleManager.count())});
