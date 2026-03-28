@@ -5,18 +5,26 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class BackgroundExecutor implements Executor {
     private final ExecutorService executorService;
+    private final ScheduledExecutorService scheduledExecutorService;
     private final AtomicLong taskCounter = new AtomicLong(0);
     private volatile boolean isShutdown = false;
 
     public BackgroundExecutor() {
-        this(4);
+        this(4, 2);
     }
 
-    public BackgroundExecutor(int corePoolSize) {
+    public BackgroundExecutor(int corePoolSize, int scheduledPoolSize) {
         this.executorService = Executors.newFixedThreadPool(corePoolSize, r -> {
             Thread t = new Thread(r);
             t.setDaemon(true);
-            t.setName("RBAC-Background-" + taskCounter.incrementAndGet());
+            t.setName("RBAC-Worker-" + taskCounter.incrementAndGet());
+            return t;
+        });
+
+        this.scheduledExecutorService = Executors.newScheduledThreadPool(scheduledPoolSize, r -> {
+            Thread t = new Thread(r);
+            t.setDaemon(true);
+            t.setName("RBAC-Scheduler-" + taskCounter.incrementAndGet());
             return t;
         });
     }
@@ -49,25 +57,28 @@ public class BackgroundExecutor implements Executor {
         }, executorService);
     }
 
-    public ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
+    public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, long initialDelay, long period, TimeUnit unit) {
         if (isShutdown) {
             throw new IllegalStateException("BackgroundExecutor is shutdown");
         }
-        if (executorService instanceof ScheduledExecutorService) {
-            return ((ScheduledExecutorService) executorService).schedule(task, delay, unit);
-        }
-        throw new UnsupportedOperationException("Executor does not support scheduling");
+        return scheduledExecutorService.scheduleAtFixedRate(task, initialDelay, period, unit);
     }
 
     public void shutdown() {
         isShutdown = true;
         executorService.shutdown();
+        scheduledExecutorService.shutdown();
+
         try {
             if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
             }
+            if (!scheduledExecutorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                scheduledExecutorService.shutdownNow();
+            }
         } catch (InterruptedException e) {
             executorService.shutdownNow();
+            scheduledExecutorService.shutdownNow();
             Thread.currentThread().interrupt();
         }
     }

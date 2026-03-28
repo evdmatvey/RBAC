@@ -10,7 +10,7 @@ class BackgroundExecutorTest {
 
     @BeforeEach
     void setUp() {
-        executor = new BackgroundExecutor(2);
+        executor = new BackgroundExecutor(2, 0);
     }
 
     @AfterEach
