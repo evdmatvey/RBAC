@@ -6,23 +6,32 @@ import filters.RoleFilter;
 import filters.RoleFilters;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class RoleManager implements Repository<Role> {
-    private final Map<String, Role> rolesById = new HashMap<>();
-    private final Map<String, Role> rolesByName = new HashMap<>();
+    private final Map<String, Role> rolesById = new ConcurrentHashMap<>();
+    private final Map<String, Role> rolesByName = new ConcurrentHashMap<>();
+    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     @Override
     public void add(Role role) {
         if (role == null) {
             throw new IllegalArgumentException("entities.Role cannot be null");
         }
-        if (rolesByName.containsKey(role.getName())) {
-            throw new IllegalArgumentException("entities.Role with name " + role.getName() + " already exists");
+
+        lock.writeLock().lock();
+        try {
+            if (rolesByName.containsKey(role.getName())) {
+                throw new IllegalArgumentException("entities.Role with name " + role.getName() + " already exists");
+            }
+            rolesById.put(role.getId(), role);
+            rolesByName.put(role.getName(), role);
+        } finally {
+            lock.writeLock().unlock();
         }
-        rolesById.put(role.getId(), role);
-        rolesByName.put(role.getName(), role);
     }
 
     @Override
@@ -30,12 +39,18 @@ public class RoleManager implements Repository<Role> {
         if (role == null) {
             return false;
         }
-        Role removed = rolesById.remove(role.getId());
-        if (removed != null) {
-            rolesByName.remove(removed.getName());
-            return true;
+
+        lock.writeLock().lock();
+        try {
+            Role removed = rolesById.remove(role.getId());
+            if (removed != null) {
+                rolesByName.remove(removed.getName());
+                return true;
+            }
+            return false;
+        } finally {
+            lock.writeLock().unlock();
         }
-        return false;
     }
 
     @Override
@@ -48,18 +63,33 @@ public class RoleManager implements Repository<Role> {
 
     @Override
     public List<Role> findAll() {
-        return new ArrayList<>(rolesById.values());
+        lock.readLock().lock();
+        try {
+            return new ArrayList<>(rolesById.values());
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public int count() {
-        return rolesById.size();
+        lock.readLock().lock();
+        try {
+            return rolesById.size();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public void clear() {
-        rolesById.clear();
-        rolesByName.clear();
+        lock.writeLock().lock();
+        try {
+            rolesById.clear();
+            rolesByName.clear();
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
     public Optional<Role> findByName(String name) {
@@ -73,23 +103,34 @@ public class RoleManager implements Repository<Role> {
         if (filter == null) {
             return findAll();
         }
-        return rolesById.values().stream()
-                .filter(filter::test)
-                .collect(Collectors.toList());
+
+        lock.readLock().lock();
+        try {
+            return rolesById.values().stream()
+                    .filter(filter::test)
+                    .collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     public List<Role> findAll(RoleFilter filter, Comparator<Role> sorter) {
-        Stream<Role> stream = rolesById.values().stream();
+        lock.readLock().lock();
+        try {
+            Stream<Role> stream = rolesById.values().stream();
 
-        if (filter != null) {
-            stream = stream.filter(filter::test);
+            if (filter != null) {
+                stream = stream.filter(filter::test);
+            }
+
+            if (sorter != null) {
+                stream = stream.sorted(sorter);
+            }
+
+            return stream.collect(Collectors.toList());
+        } finally {
+            lock.readLock().unlock();
         }
-
-        if (sorter != null) {
-            stream = stream.sorted(sorter);
-        }
-
-        return stream.collect(Collectors.toList());
     }
 
     public boolean exists(String name) {
@@ -104,12 +145,16 @@ public class RoleManager implements Repository<Role> {
             throw new IllegalArgumentException("entities.Role name and permission cannot be null");
         }
 
-        Role role = rolesByName.get(roleName);
-        if (role == null) {
-            throw new NoSuchElementException("entities.Role not found: " + roleName);
+        lock.writeLock().lock();
+        try {
+            Role role = rolesByName.get(roleName);
+            if (role == null) {
+                throw new NoSuchElementException("entities.Role not found: " + roleName);
+            }
+            role.addPermission(permission);
+        } finally {
+            lock.writeLock().unlock();
         }
-
-        role.addPermission(permission);
     }
 
     public void removePermissionFromRole(String roleName, Permission permission) {
@@ -117,12 +162,16 @@ public class RoleManager implements Repository<Role> {
             throw new IllegalArgumentException("entities.Role name and permission cannot be null");
         }
 
-        Role role = rolesByName.get(roleName);
-        if (role == null) {
-            throw new NoSuchElementException("entities.Role not found: " + roleName);
+        lock.writeLock().lock();
+        try {
+            Role role = rolesByName.get(roleName);
+            if (role == null) {
+                throw new NoSuchElementException("entities.Role not found: " + roleName);
+            }
+            role.removePermission(permission);
+        } finally {
+            lock.writeLock().unlock();
         }
-
-        role.removePermission(permission);
     }
 
     public List<Role> findRolesWithPermission(String permissionName, String resource) {
@@ -139,11 +188,21 @@ public class RoleManager implements Repository<Role> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         RoleManager that = (RoleManager) o;
-        return rolesById.equals(that.rolesById);
+        lock.readLock().lock();
+        try {
+            return rolesById.equals(that.rolesById);
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 
     @Override
     public int hashCode() {
-        return rolesById.hashCode();
+        lock.readLock().lock();
+        try {
+            return rolesById.hashCode();
+        } finally {
+            lock.readLock().unlock();
+        }
     }
 }
