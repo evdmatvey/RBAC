@@ -11,7 +11,7 @@ class AsyncAuditLogTest {
 
     @BeforeEach
     void setUp() {
-        executor = new BackgroundExecutor(2);
+        executor = new BackgroundExecutor(2, 0);
         asyncAuditLog = new AsyncAuditLog(executor);
     }
 

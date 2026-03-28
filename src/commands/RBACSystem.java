@@ -3,19 +3,16 @@ package commands;
 import entities.*;
 import repositories.*;
 import utils.*;
-
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 public class RBACSystem {
     private UserManager userManager;
     private RoleManager roleManager;
     private AssignmentManager assignmentManager;
     private String currentUser;
-
     private BackgroundExecutor backgroundExecutor;
     private AsyncAuditLog asyncAuditLog;
+    private ScheduledExpiredAssignmentsCleaner expiredAssignmentsCleaner;
 
     public RBACSystem() {
         this.userManager = new UserManager();
@@ -23,6 +20,7 @@ public class RBACSystem {
         this.assignmentManager = new AssignmentManager(userManager, roleManager);
         this.backgroundExecutor = new BackgroundExecutor();
         this.asyncAuditLog = new AsyncAuditLog(backgroundExecutor);
+        this.expiredAssignmentsCleaner = new ScheduledExpiredAssignmentsCleaner(this, backgroundExecutor, 30);
     }
 
     public BackgroundExecutor getBackgroundExecutor() {
@@ -31,6 +29,10 @@ public class RBACSystem {
 
     public AsyncAuditLog getAsyncAuditLog() {
         return asyncAuditLog;
+    }
+
+    public ScheduledExpiredAssignmentsCleaner getExpiredAssignmentsCleaner() {
+        return expiredAssignmentsCleaner;
     }
 
     public void setCurrentUser(String username) {
@@ -63,7 +65,9 @@ public class RBACSystem {
         createAdmin();
         assignRoleToAdmin();
 
-        asyncAuditLog.log("SYSTEM_INIT", "system", "RBAC", "System initialized");
+        expiredAssignmentsCleaner.start();
+
+        asyncAuditLog.log("SYSTEM_INIT", "system", "RBAC", "System initialized with expired assignments cleaner");
     }
 
     public void shutdown() {
@@ -132,9 +136,9 @@ public class RBACSystem {
 
     private void assignRoleToAdmin() {
         User admin = userManager.findByUsername("admin")
-                .orElseThrow(() -> new NoSuchElementException("Admin user not found in user manager!"));
+                .orElseThrow(() -> new NoSuchElementException("Admin user not found!"));
         Role adminRole = roleManager.findByName("admin")
-                .orElseThrow(() -> new NoSuchElementException("Admin role not found in role manager!"));
+                .orElseThrow(() -> new NoSuchElementException("Admin role not found!"));
 
         AssignmentMetadata metadata = AssignmentMetadata.now("system", "initialization");
         PermanentAssignment adminAssignment = new PermanentAssignment(admin, adminRole, metadata);
@@ -144,11 +148,16 @@ public class RBACSystem {
 
     public String generateStatistics() {
         String[] headers = {"Name", "Count"};
-        java.util.ArrayList<String[]> rows = new java.util.ArrayList<>();
+        ArrayList<String[]> rows = new ArrayList<>();
 
         rows.add(new String[]{"Users", String.valueOf(userManager.count())});
         rows.add(new String[]{"Roles", String.valueOf(roleManager.count())});
         rows.add(new String[]{"Assignments", String.valueOf(assignmentManager.count())});
+        rows.add(new String[]{"Active Assignments", String.valueOf(assignmentManager.getActiveAssignments().size())});
+        rows.add(new String[]{"Expired Assignments", String.valueOf(assignmentManager.getExpiredAssignments().size())});
+        rows.add(new String[]{"Cleanup Runs", String.valueOf(expiredAssignmentsCleaner.getTaskRuns())});
+        rows.add(new String[]{"Total Expired Found", String.valueOf(expiredAssignmentsCleaner.getTotalExpiredFound())});
+        rows.add(new String[]{"Total Expired Marked", String.valueOf(expiredAssignmentsCleaner.getTotalExpiredMarked())});
 
         return FormatUtils.formatTable(headers, rows);
     }

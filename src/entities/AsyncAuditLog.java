@@ -1,7 +1,6 @@
 package entities;
 
 import utils.BackgroundExecutor;
-
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -9,7 +8,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class AsyncAuditLog {
-    private final AuditLog delegate; // Используем существующий AuditLog
+    private final AuditLog delegate;
     private final BlockingQueue<AuditEntry> queue;
     private final BackgroundExecutor executor;
     private volatile boolean running = true;
@@ -28,7 +27,6 @@ public class AsyncAuditLog {
                 try {
                     AuditEntry entry = queue.poll(100, TimeUnit.MILLISECONDS);
                     if (entry != null) {
-                        // Используем существующий метод log для добавления в delegate
                         delegate.log(entry.action(), entry.performer(), entry.target(), entry.details());
                     }
                 } catch (InterruptedException e) {
@@ -39,7 +37,6 @@ public class AsyncAuditLog {
         });
     }
 
-    // Асинхронное логирование - не блокирует вызывающий поток
     public CompletableFuture<Void> log(String action, String performer, String target, String details) {
         if (action == null || performer == null) {
             throw new IllegalArgumentException("Action and performer cannot be null");
@@ -55,7 +52,6 @@ public class AsyncAuditLog {
         return executor.submit(() -> {
             try {
                 if (!queue.offer(entry, 1, TimeUnit.SECONDS)) {
-                    // Если очередь переполнена, логируем синхронно
                     delegate.log(action, performer, target, details);
                 }
             } catch (InterruptedException e) {
@@ -65,7 +61,6 @@ public class AsyncAuditLog {
         });
     }
 
-    // Делегируем методы существующего AuditLog
     public List<AuditEntry> getAll() {
         return delegate.getAll();
     }
