@@ -1,5 +1,7 @@
 import repositories.*;
 import entities.*;
+import filters.AssignmentFilter;
+import filters.AssignmentFilters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -141,6 +143,158 @@ class AssignmentManagerTest {
     }
 
     @Test
+    @DisplayName("Should find assignments by user using parallel stream")
+    void testFindByUserParallel() {
+        Role role2 = new Role("ROLE_2", "Second role");
+        Role role3 = new Role("ROLE_3", "Third role");
+        when(roleManager.findByName("ROLE_2")).thenReturn(Optional.of(role2));
+        when(roleManager.findByName("ROLE_3")).thenReturn(Optional.of(role3));
+
+        PermanentAssignment assignment1 = new PermanentAssignment(testUser, testRole, metadata);
+        PermanentAssignment assignment2 = new PermanentAssignment(testUser, role2, metadata);
+        PermanentAssignment assignment3 = new PermanentAssignment(testUser, role3, metadata);
+
+        assignmentManager.add(assignment1);
+        assignmentManager.add(assignment2);
+        assignmentManager.add(assignment3);
+
+        List<RoleAssignment> userAssignments = assignmentManager.findByUserParallel(testUser);
+
+        assertEquals(3, userAssignments.size());
+        assertTrue(userAssignments.stream().allMatch(a -> a.user().equals(testUser)));
+    }
+
+    @Test
+    @DisplayName("Should return empty list when finding by user parallel with null")
+    void testFindByUserParallelWithNull() {
+        List<RoleAssignment> assignments = assignmentManager.findByUserParallel(null);
+        assertNotNull(assignments);
+        assertTrue(assignments.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should find assignments by role using parallel stream")
+    void testFindByRoleParallel() {
+        User user2 = User.create("user2", "User Two", "user2@example.com");
+        User user3 = User.create("user3", "User Three", "user3@example.com");
+        when(userManager.findByUsername("user2")).thenReturn(Optional.of(user2));
+        when(userManager.findByUsername("user3")).thenReturn(Optional.of(user3));
+
+        PermanentAssignment assignment1 = new PermanentAssignment(testUser, testRole, metadata);
+        PermanentAssignment assignment2 = new PermanentAssignment(user2, testRole, metadata);
+        PermanentAssignment assignment3 = new PermanentAssignment(user3, testRole, metadata);
+
+        assignmentManager.add(assignment1);
+        assignmentManager.add(assignment2);
+        assignmentManager.add(assignment3);
+
+        List<RoleAssignment> roleAssignments = assignmentManager.findByRoleParallel(testRole);
+
+        assertEquals(3, roleAssignments.size());
+        assertTrue(roleAssignments.stream().allMatch(a -> a.role().equals(testRole)));
+    }
+
+    @Test
+    @DisplayName("Should return empty list when finding by role parallel with null")
+    void testFindByRoleParallelWithNull() {
+        List<RoleAssignment> assignments = assignmentManager.findByRoleParallel(null);
+        assertNotNull(assignments);
+        assertTrue(assignments.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should find assignments by filter using parallel stream")
+    void testFindByFilterParallel() {
+        User user2 = User.create("user2", "User Two", "user2@example.com");
+        when(userManager.findByUsername("user2")).thenReturn(Optional.of(user2));
+
+        PermanentAssignment assignment1 = new PermanentAssignment(testUser, testRole, metadata);
+        PermanentAssignment assignment2 = new PermanentAssignment(user2, testRole, metadata);
+
+        assignmentManager.add(assignment1);
+        assignmentManager.add(assignment2);
+
+        AssignmentFilter filter = AssignmentFilters.byUser(testUser);
+        List<RoleAssignment> filteredAssignments = assignmentManager.findByFilterParallel(filter);
+
+        assertEquals(1, filteredAssignments.size());
+        assertEquals(testUser, filteredAssignments.get(0).user());
+    }
+
+    @Test
+    @DisplayName("Should return all assignments when filter is null in parallel")
+    void testFindByFilterParallelWithNullFilter() {
+        int assignmentCount = 5;
+        for (int i = 0; i < assignmentCount; i++) {
+            Role role = new Role("ROLE_" + i, "Role " + i);
+            when(roleManager.findByName("ROLE_" + i)).thenReturn(Optional.of(role));
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            when(userManager.findByUsername("user_" + i)).thenReturn(Optional.of(user));
+
+            PermanentAssignment assignment = new PermanentAssignment(
+                    user, role, AssignmentMetadata.now("admin", "Test")
+            );
+            assignmentManager.add(assignment);
+        }
+
+        List<RoleAssignment> assignments = assignmentManager.findByFilterParallel(null);
+        assertEquals(assignmentCount, assignments.size());
+    }
+
+    @Test
+    @DisplayName("Should get user permissions using parallel stream")
+    void testGetUserPermissionsParallel() {
+        Permission readPermission = new Permission("READ", "users", "Read users");
+        Permission writePermission = new Permission("WRITE", "users", "Write users");
+        Permission deletePermission = new Permission("DELETE", "users", "Delete users");
+
+        testRole.addPermission(readPermission);
+        testRole.addPermission(writePermission);
+        testRole.addPermission(deletePermission);
+
+        PermanentAssignment assignment = new PermanentAssignment(testUser, testRole, metadata);
+        assignmentManager.add(assignment);
+
+        Set<Permission> permissions = assignmentManager.getUserPermissionsParallel(testUser);
+
+        assertEquals(3, permissions.size());
+        assertTrue(permissions.contains(readPermission));
+        assertTrue(permissions.contains(writePermission));
+        assertTrue(permissions.contains(deletePermission));
+    }
+
+    @Test
+    @DisplayName("Should return empty set when getting user permissions parallel with null")
+    void testGetUserPermissionsParallelWithNull() {
+        Set<Permission> permissions = assignmentManager.getUserPermissionsParallel(null);
+        assertNotNull(permissions);
+        assertTrue(permissions.isEmpty());
+    }
+
+    @Test
+    @DisplayName("Should get user permissions parallel only for active assignments")
+    void testGetUserPermissionsParallelOnlyActive() {
+        Permission readPermission = new Permission("READ", "users", "Read users");
+        testRole.addPermission(readPermission);
+
+        PermanentAssignment activeAssignment = new PermanentAssignment(testUser, testRole, metadata);
+        assignmentManager.add(activeAssignment);
+
+        User user2 = User.create("user2", "User Two", "user2@example.com");
+        when(userManager.findByUsername("user2")).thenReturn(Optional.of(user2));
+
+        PermanentAssignment revokedAssignment = new PermanentAssignment(user2, testRole, metadata);
+        assignmentManager.add(revokedAssignment);
+        assignmentManager.revokeAssignment(revokedAssignment.assignmentId());
+
+        Set<Permission> permissionsForActiveUser = assignmentManager.getUserPermissionsParallel(testUser);
+        Set<Permission> permissionsForRevokedUser = assignmentManager.getUserPermissionsParallel(user2);
+
+        assertEquals(1, permissionsForActiveUser.size());
+        assertEquals(0, permissionsForRevokedUser.size());
+    }
+
+    @Test
     @DisplayName("Should get user permissions")
     void testGetUserPermissions() {
         Permission readPermission = new Permission("READ", "users", "Read users");
@@ -226,6 +380,115 @@ class AssignmentManagerTest {
         assertTrue(completed, "Test timed out");
         assertEquals(threadCount * 50, successCount.get() + failureCount.get());
         assertTrue(successCount.get() > 0, "No successful assignments");
+    }
+
+    @Test
+    @DisplayName("Should handle concurrent parallel operations")
+    void testConcurrentParallelOperations() throws InterruptedException {
+        int assignmentCount = 100;
+        List<User> users = new ArrayList<>();
+        List<Role> roles = new ArrayList<>();
+
+        for (int i = 0; i < 20; i++) {
+            User user = User.create("user_" + i, "User " + i, "user" + i + "@example.com");
+            users.add(user);
+            lenient().when(userManager.findByUsername("user_" + i)).thenReturn(Optional.of(user));
+
+            Role role = new Role("ROLE_" + i, "Role " + i);
+            roles.add(role);
+            lenient().when(roleManager.findByName("ROLE_" + i)).thenReturn(Optional.of(role));
+        }
+
+        for (int i = 0; i < assignmentCount; i++) {
+            User user = users.get(i % users.size());
+            Role role = roles.get(i % roles.size());
+
+            try {
+                PermanentAssignment assignment = new PermanentAssignment(
+                        user,
+                        role,
+                        AssignmentMetadata.now("admin", "Test " + i)
+                );
+                assignmentManager.add(assignment);
+            } catch (IllegalArgumentException e) {
+                System.out.println("Skipping duplicate assignment: " + e.getMessage());
+            }
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        CountDownLatch latch = new CountDownLatch(10);
+        AtomicInteger successCount = new AtomicInteger(0);
+
+        for (int i = 0; i < 10; i++) {
+            executor.submit(() -> {
+                try {
+                    List<RoleAssignment> byUser = assignmentManager.findByUserParallel(users.get(0));
+                    List<RoleAssignment> byRole = assignmentManager.findByRoleParallel(roles.get(0));
+                    List<RoleAssignment> byFilter = assignmentManager.findByFilterParallel(
+                            AssignmentFilters.activeOnly()
+                    );
+                    Set<Permission> permissions = assignmentManager.getUserPermissionsParallel(users.get(0));
+
+                    assertNotNull(byUser);
+                    assertNotNull(byRole);
+                    assertNotNull(byFilter);
+                    assertNotNull(permissions);
+
+                    successCount.incrementAndGet();
+                } catch (Exception e) {
+                    fail("Exception in parallel operation: " + e.getMessage());
+                }
+                latch.countDown();
+            });
+        }
+
+        assertTrue(latch.await(30, TimeUnit.SECONDS));
+        executor.shutdown();
+        assertEquals(10, successCount.get());
+    }
+
+    @Test
+    @DisplayName("Should maintain consistency between sequential and parallel findByUser")
+    void testSequentialVsParallelFindByUserConsistency() {
+        Role role2 = new Role("ROLE_2", "Second role");
+        Role role3 = new Role("ROLE_3", "Third role");
+        when(roleManager.findByName("ROLE_2")).thenReturn(Optional.of(role2));
+        when(roleManager.findByName("ROLE_3")).thenReturn(Optional.of(role3));
+
+        PermanentAssignment assignment1 = new PermanentAssignment(testUser, testRole, metadata);
+        PermanentAssignment assignment2 = new PermanentAssignment(testUser, role2, metadata);
+        PermanentAssignment assignment3 = new PermanentAssignment(testUser, role3, metadata);
+
+        assignmentManager.add(assignment1);
+        assignmentManager.add(assignment2);
+        assignmentManager.add(assignment3);
+
+        List<RoleAssignment> sequential = assignmentManager.findByUser(testUser);
+        List<RoleAssignment> parallel = assignmentManager.findByUserParallel(testUser);
+
+        assertEquals(sequential.size(), parallel.size());
+        assertTrue(sequential.containsAll(parallel) && parallel.containsAll(sequential));
+    }
+
+    @Test
+    @DisplayName("Should maintain consistency between sequential and parallel getUserPermissions")
+    void testSequentialVsParallelGetUserPermissionsConsistency() {
+        Permission readPermission = new Permission("READ", "users", "Read users");
+        Permission writePermission = new Permission("WRITE", "users", "Write users");
+        Permission deletePermission = new Permission("DELETE", "users", "Delete users");
+
+        testRole.addPermission(readPermission);
+        testRole.addPermission(writePermission);
+        testRole.addPermission(deletePermission);
+
+        PermanentAssignment assignment = new PermanentAssignment(testUser, testRole, metadata);
+        assignmentManager.add(assignment);
+
+        Set<Permission> sequential = assignmentManager.getUserPermissions(testUser);
+        Set<Permission> parallel = assignmentManager.getUserPermissionsParallel(testUser);
+
+        assertEquals(sequential.size(), parallel.size());
+        assertTrue(sequential.containsAll(parallel) && parallel.containsAll(sequential));
     }
 
     @Test
