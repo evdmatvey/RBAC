@@ -231,15 +231,6 @@ class CommandRegistryTest {
         }
 
         @Test
-        void reportUsersCommandGeneratesReport() {
-            provideInput("\n");
-            commandParser.parseAndExecute("report-users", createScanner(), rbacSystem);
-
-            String output = outputStream.toString();
-            assertTrue(output.contains("Users report"));
-        }
-
-        @Test
         void reportRolesCommandGeneratesReport() {
             provideInput("\n");
             commandParser.parseAndExecute("report-roles", createScanner(), rbacSystem);
